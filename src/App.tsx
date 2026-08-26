@@ -5,21 +5,9 @@ import { ContractImporter } from "@/components/contract-importer/ContractImporte
 import { EmptyState } from "@/components/empty-state/EmptyState";
 import { FunctionCard } from "@/components/function-card/FunctionCard";
 import { Header } from "@/components/header/Header";
-import type {
-  AbiInput,
-  AbiFunction,
-  Network,
-  Result,
-} from "@/components/types";
+import type { AbiInput, AbiFunction, Result } from "@/components/types";
 import { cn } from "@/lib/utils";
 import "./App.css";
-
-const networks: Network[] = [
-  { id: "eth", name: "Ethereum", color: "#8b9cff" },
-  { id: "poly", name: "Polygon", color: "#b388ff" },
-  { id: "bsc", name: "BNB Chain", color: "#f2bd62" },
-  { id: "arb", name: "Arbitrum", color: "#62d9ec" },
-];
 
 const functionRows: [
   string,
@@ -123,7 +111,6 @@ function App() {
   const [address, setAddress] = useState("");
   const [paste, setPaste] = useState("");
   const [error, setError] = useState("");
-  const [wallet, setWallet] = useState(false);
   const [dark, setDark] = useState(true);
   const [tab, setTab] = useState<"read" | "write">("read");
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -285,7 +272,6 @@ function App() {
                     values={values[fn.name] ?? emptyValues}
                     result={results[fn.name]}
                     isWrite={tab === "write"}
-                    wallet={wallet}
                     onToggle={toggleExpanded}
                     onChange={changeValue}
                     onRun={runFunction}

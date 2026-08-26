@@ -3,14 +3,13 @@ import { ChevronRight, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { AbiFunction, Result } from "../types";
-
+import { useAccount } from "wagmi";
 type FunctionCardProps = {
   fn: AbiFunction;
   expanded: boolean;
   values: Record<string, string>;
   result?: Result;
   isWrite: boolean;
-  wallet: boolean;
   onToggle: (functionName: string) => void;
   onChange: (functionName: string, key: string, value: string) => void;
   onRun: (fn: AbiFunction, isWrite: boolean) => void;
@@ -22,12 +21,13 @@ export const FunctionCard = memo(function FunctionCard({
   values,
   result,
   isWrite,
-  wallet,
   onToggle,
   onChange,
   onRun,
 }: FunctionCardProps) {
-  return (
+    const {isConnected} = useAccount()
+    return (
+
     <article className={cn("method-card", expanded && "expanded")}>
       <button className="method-header" onClick={() => onToggle(fn.name)}>
         <ChevronRight
@@ -75,13 +75,13 @@ export const FunctionCard = memo(function FunctionCard({
                 "run-button",
                 isWrite ? "write-button" : "read-button",
               )}
-              disabled={isWrite && !wallet}
+              disabled={isWrite && !isConnected}
               onClick={() => onRun(fn, isWrite)}
             >
               {isWrite ? <Send size={14} /> : null}
               {isWrite ? "Write" : result?.loading ? "Querying..." : "Query"}
             </Button>
-            {isWrite && !wallet && (
+            {isWrite && !isConnected && (
               <span className="hint">
                 Connect a wallet to send transactions
               </span>
