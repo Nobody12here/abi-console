@@ -1,16 +1,19 @@
-import { createConfig, http } from 'wagmi'
-import { mainnet, sepolia } from 'wagmi/chains'
+import '@rainbow-me/rainbowkit/styles.css';
+import {
+  getDefaultConfig,
+} from '@rainbow-me/rainbowkit';
 
-export const config = createConfig({
-  chains: [mainnet, sepolia],
-  transports: {
-    [mainnet.id]: http(),
-    [sepolia.id]: http(),
-  },
-})
+import {
+  mainnet,
+  polygon,
+  optimism,
+  arbitrum,
+  base,
+} from 'wagmi/chains';
 
-declare module 'wagmi' {
-  interface Register {
-    config: typeof config
-  }
-}
+export const config = getDefaultConfig({
+  appName: 'ABI Console',
+  projectId: import.meta.env.VITE_WALLET_CONNECT_PROJECT_ID,
+  chains: [mainnet, polygon, optimism, arbitrum, base],
+
+});

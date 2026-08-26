@@ -1,0 +1,44 @@
+import { memo, useState } from "react";
+import { Braces, FileJson } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import type { AbiFunction } from "../types";
+
+export const AbiViewer = memo(function AbiViewer({ abi }: { abi: AbiFunction[] }) {
+  const [raw, setRaw] = useState(false);
+
+  return (
+    <section className="panel abi-panel">
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">SCHEMA</p>
+          <h2>
+            ABI <small>{abi.length} functions</small>
+          </h2>
+        </div>
+        <Button variant="ghost" size="sm" onClick={() => setRaw(!raw)}>
+          {raw ? <Braces size={14} /> : <FileJson size={14} />}
+          {raw ? "Tree view" : "Edit JSON"}
+        </Button>
+      </div>
+      {raw ? (
+        <pre className="raw-abi">{JSON.stringify(abi, null, 2)}</pre>
+      ) : (
+        <div className="abi-list">
+          {abi.map((fn) => (
+            <div className="abi-item" key={fn.name}>
+              <span className={cn("type-dot", fn.stateMutability)} />
+              <span className="mono name">{fn.name}</span>
+              <span className="mono signature">
+                ({fn.inputs.map((input) => input.type).join(", ")})
+              </span>
+              {fn.outputs?.[0] && (
+                <span className="mono output">-&gt; {fn.outputs[0].type}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+});
