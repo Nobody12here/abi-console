@@ -5,7 +5,12 @@ import { ContractImporter } from "@/components/contract-importer/ContractImporte
 import { EmptyState } from "@/components/empty-state/EmptyState";
 import { FunctionCard } from "@/components/function-card/FunctionCard";
 import { Header } from "@/components/header/Header";
-import type { AbiInput, AbiFunction, Network, Result } from "@/components/types";
+import type {
+  AbiInput,
+  AbiFunction,
+  Network,
+  Result,
+} from "@/components/types";
 import { cn } from "@/lib/utils";
 import "./App.css";
 
@@ -118,10 +123,7 @@ function App() {
   const [address, setAddress] = useState("");
   const [paste, setPaste] = useState("");
   const [error, setError] = useState("");
-  const [network, setNetwork] = useState(networks[0]);
-  const [networkOpen, setNetworkOpen] = useState(false);
   const [wallet, setWallet] = useState(false);
-  const [walletOpen, setWalletOpen] = useState(false);
   const [dark, setDark] = useState(true);
   const [tab, setTab] = useState<"read" | "write">("read");
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -162,12 +164,15 @@ function App() {
       }
     };
   }, []);
-  const loadAbi = useCallback((nextAbi: AbiFunction[]) => {
-    setAbi(nextAbi);
-    setExpanded(null);
-    setResults({});
-    notify(`ABI loaded - ${nextAbi.length} functions found`);
-  }, [notify]);
+  const loadAbi = useCallback(
+    (nextAbi: AbiFunction[]) => {
+      setAbi(nextAbi);
+      setExpanded(null);
+      setResults({});
+      notify(`ABI loaded - ${nextAbi.length} functions found`);
+    },
+    [notify],
+  );
   const parseAbi = useCallback(() => {
     try {
       const parsed = JSON.parse(paste) as AbiFunction[];
@@ -179,22 +184,25 @@ function App() {
       setError("Paste a valid ABI JSON array with function entries.");
     }
   }, [loadAbi, paste]);
-  const runFunction = useCallback((fn: AbiFunction, isWrite: boolean) => {
-    if (isWrite) {
-      notify(`${fn.name}() transaction submitted`);
-      return;
-    }
-    setResults((current) => ({
-      ...current,
-      [fn.name]: { value: "", loading: true },
-    }));
-    window.setTimeout(() => {
+  const runFunction = useCallback(
+    (fn: AbiFunction, isWrite: boolean) => {
+      if (isWrite) {
+        notify(`${fn.name}() transaction submitted`);
+        return;
+      }
       setResults((current) => ({
         ...current,
-        [fn.name]: knownResults[fn.name] ?? { value: "0x8b5e...c912" },
+        [fn.name]: { value: "", loading: true },
       }));
-    }, 450);
-  }, [notify]);
+      window.setTimeout(() => {
+        setResults((current) => ({
+          ...current,
+          [fn.name]: knownResults[fn.name] ?? { value: "0x8b5e...c912" },
+        }));
+      }, 450);
+    },
+    [notify],
+  );
   const copyAddress = useCallback(() => {
     void navigator.clipboard?.writeText(contractAddress);
     setCopied(true);
@@ -217,31 +225,8 @@ function App() {
   return (
     <div className={cn("app-shell", !dark && "light-mode")}>
       <Header
-        network={network}
-        networks={networks}
-        networkOpen={networkOpen}
-        wallet={wallet}
-        walletOpen={walletOpen}
         dark={dark}
-        onToggleNetwork={() => setNetworkOpen((current) => !current)}
-        onSelectNetwork={(item) => {
-          setNetwork(item);
-          setNetworkOpen(false);
-        }}
         onToggleTheme={() => setDark((current) => !current)}
-        onConnectWallet={() => {
-          setWallet(true);
-          notify("Wallet connected");
-        }}
-        onToggleWallet={() => setWalletOpen((current) => !current)}
-        onCopyWallet={() => {
-          void navigator.clipboard?.writeText("0x91c...2a8d");
-          setWalletOpen(false);
-        }}
-        onDisconnectWallet={() => {
-          setWallet(false);
-          setWalletOpen(false);
-        }}
       />
       <main className="workspace">
         <aside className="sidebar">
@@ -268,7 +253,7 @@ function App() {
         </aside>
         <section className="content-area">
           {!abi ? (
-                  <EmptyState onLoad={loadDemo} />
+            <EmptyState onLoad={loadDemo} />
           ) : (
             <>
               <div className="content-heading">
