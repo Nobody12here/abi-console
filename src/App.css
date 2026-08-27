@@ -29,3 +29,13 @@
 	background: color-mix(in srgb, var(--blue) 18%, var(--surface));
 	color: var(--text);
 }
+.empty-state .demo-button {
+	border-color: var(--line-strong);
+	background: color-mix(in srgb, var(--surface) 92%, transparent);
+	color: var(--text);
+}
+.empty-state .demo-button:hover {
+	border-color: color-mix(in srgb, var(--blue) 55%, var(--line-strong));
+	background: var(--surface-2);
+	color: var(--text);
+}

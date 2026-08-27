@@ -18,7 +18,12 @@ export const EmptyState = memo(function EmptyState({
         Fetch an ABI by address, paste your JSON, or upload a local file. The
         console will generate an interface for every read and write method.
       </p>
-      <Button variant="outline" onClick={onLoad}>
+      <Button
+        className="demo-button"
+        variant="outline"
+        aria-label="Load Demo contract"
+        onClick={onLoad}
+      >
         <FileJson size={15} />
         Load demo contract
       </Button>

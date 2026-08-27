@@ -1,8 +1,17 @@
-import { Braces, Check, ChevronRight, CircleHelp, Copy, Upload, Zap } from "lucide-react";
+import {
+  Braces,
+  Check,
+  ChevronRight,
+  CircleHelp,
+  Copy,
+  Upload,
+  Zap,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { AbiFunction } from "../types";
 import { cn } from "@/lib/utils";
-
+import { config } from "@/wagmiConfig";
+import { getChainId } from "@wagmi/core";
 type ImportMode = "address" | "paste" | "upload";
 
 type ContractImporterProps = {
@@ -26,6 +35,18 @@ const modes: Array<[ImportMode, string]> = [
   ["paste", "Paste ABI"],
   ["upload", "Upload"],
 ];
+const ETHERSCAN_API_URL = import.meta.env.VITE_ETHERSCAN_ABI_API;
+
+const fetchContractABI = async (address: string) => {
+  console.log(getChainId(config));
+  const res = await fetch(
+    `${ETHERSCAN_API_URL}&module=contract&action=getabi&chainid=${getChainId(config)}&address=${address}`,
+  );
+  if (!res.ok) throw new Error("Error fetching contract ABI...");
+  const data = await res.json();
+  console.log(data);
+  return data;
+};
 
 export function ContractImporter({
   abi,
@@ -57,14 +78,20 @@ export function ContractImporter({
       </div>
       <div className="segmented">
         {modes.map(([id, label]) => (
-          <button key={id} className={cn(importMode === id && "selected")} onClick={() => onModeChange(id)}>
+          <button
+            key={id}
+            className={cn(importMode === id && "selected")}
+            onClick={() => onModeChange(id)}
+          >
             {label}
           </button>
         ))}
       </div>
       {importMode === "address" && (
         <div className="form-stack">
-          <label className="field-label" htmlFor="contract-address">CONTRACT ADDRESS</label>
+          <label className="field-label" htmlFor="contract-address">
+            CONTRACT ADDRESS
+          </label>
           <input
             id="contract-address"
             value={address}
@@ -72,7 +99,12 @@ export function ContractImporter({
             placeholder="0x... contract address"
             className="field mono"
           />
-          <Button className="action-button" onClick={onFetch}>
+          <Button
+            className="action-button"
+            onClick={() => {
+              fetchContractABI(address);
+            }}
+          >
             <Zap size={15} />
             Fetch ABI <ChevronRight size={15} />
           </Button>
@@ -80,7 +112,9 @@ export function ContractImporter({
       )}
       {importMode === "paste" && (
         <div className="form-stack">
-          <label className="field-label" htmlFor="abi-json">ABI JSON</label>
+          <label className="field-label" htmlFor="abi-json">
+            ABI JSON
+          </label>
           <textarea
             id="abi-json"
             value={paste}
