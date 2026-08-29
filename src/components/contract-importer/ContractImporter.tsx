@@ -17,6 +17,7 @@ type ImportMode = "address" | "paste" | "upload";
 type ContractImporterProps = {
   abi: AbiFunction[] | null;
   importMode: ImportMode;
+  isLoading:boolean;
   address: string;
   paste: string;
   error: string;
@@ -24,7 +25,8 @@ type ContractImporterProps = {
   onModeChange: (mode: ImportMode) => void;
   onAddressChange: (address: string) => void;
   onPasteChange: (paste: string) => void;
-  onFetch: () => void;
+  onFetch: (abi: AbiFunction[]) => void;
+  onError: (error: string) => void;
   onParse: () => void;
   onUpload: () => void;
   onCopyAddress: () => void;
@@ -38,14 +40,14 @@ const modes: Array<[ImportMode, string]> = [
 const ETHERSCAN_API_URL = import.meta.env.VITE_ETHERSCAN_ABI_API;
 
 const fetchContractABI = async (address: string) => {
-  console.log(getChainId(config));
   const res = await fetch(
     `${ETHERSCAN_API_URL}&module=contract&action=getabi&chainid=${getChainId(config)}&address=${address}`,
   );
   if (!res.ok) throw new Error("Error fetching contract ABI...");
-  const data = await res.json();
-  console.log(data);
-  return data;
+  let data = await res.json();
+  if (data.status !== "1")
+    throw new Error(data.result || "Contract ABI not found !");
+  return JSON.parse(data.result.toString());
 };
 
 export function ContractImporter({
@@ -55,10 +57,12 @@ export function ContractImporter({
   paste,
   error,
   copied,
+  isLoading,
   onModeChange,
   onAddressChange,
   onPasteChange,
   onFetch,
+  onError,
   onParse,
   onUpload,
   onCopyAddress,
@@ -101,9 +105,16 @@ export function ContractImporter({
           />
           <Button
             className="action-button"
-            onClick={() => {
-              fetchContractABI(address);
+            onClick={async () => {
+              let abi: AbiFunction[] = [];
+              try {
+                abi = (await fetchContractABI(address)) as AbiFunction[];
+                onFetch(abi);
+              } catch (e) {
+                onError(e instanceof Error ? e.message : "Unknown Error");
+              }
             }}
+            disabled={isLoading}
           >
             <Zap size={15} />
             Fetch ABI <ChevronRight size={15} />
@@ -144,7 +155,7 @@ export function ContractImporter({
       {abi && (
         <div className="contract-row">
           <span className="identicon" />
-          <span className="mono">0x742d...8f44e</span>
+          <span className="mono">{address}</span>
           <button onClick={onCopyAddress} aria-label="Copy contract address">
             {copied ? <Check size={14} /> : <Copy size={14} />}
           </button>
