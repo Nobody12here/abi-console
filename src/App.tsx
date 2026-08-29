@@ -6,7 +6,9 @@ import { EmptyState } from "@/components/empty-state/EmptyState";
 import { FunctionCard } from "@/components/function-card/FunctionCard";
 import { Header } from "@/components/header/Header";
 import type { AbiInput, AbiFunction, Result } from "@/components/types";
+import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
+
 import "./App.css";
 
 const emptyValues: Record<string, string> = {};
@@ -25,7 +27,7 @@ function App() {
   const [values, setValues] = useState<Record<string, Record<string, string>>>(
     {},
   );
-  const [isLoading,setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [results, setResults] = useState<Record<string, Result>>({});
   const [copied, setCopied] = useState(false);
   const [toast, setToast] = useState("");
@@ -123,6 +125,7 @@ function App() {
         dark={dark}
         onToggleTheme={() => setDark((current) => !current)}
       />
+
       <main className="workspace">
         <aside className="sidebar">
           <ContractImporter
@@ -133,6 +136,7 @@ function App() {
             paste={paste}
             error={error}
             copied={copied}
+            onLoadingChange={setIsLoading}
             onModeChange={setImportMode}
             onAddressChange={setContractAddress}
             onPasteChange={setPaste}
@@ -197,6 +201,11 @@ function App() {
           )}
         </section>
       </main>
+      {isLoading && (
+        <div className="loading-overlay">
+          <Spinner />
+        </div>
+      )}
       {toast && (
         <div className="toast">
           <Check size={15} />

@@ -22,6 +22,7 @@ type ContractImporterProps = {
   paste: string;
   error: string;
   copied: boolean;
+  onLoadingChange: (loading:boolean) => void;
   onModeChange: (mode: ImportMode) => void;
   onAddressChange: (address: string) => void;
   onPasteChange: (paste: string) => void;
@@ -58,6 +59,7 @@ export function ContractImporter({
   error,
   copied,
   isLoading,
+  onLoadingChange,
   onModeChange,
   onAddressChange,
   onPasteChange,
@@ -107,11 +109,15 @@ export function ContractImporter({
             className="action-button"
             onClick={async () => {
               let abi: AbiFunction[] = [];
+              onLoadingChange(true)
               try {
                 abi = (await fetchContractABI(address)) as AbiFunction[];
                 onFetch(abi);
               } catch (e) {
                 onError(e instanceof Error ? e.message : "Unknown Error");
+              }
+              finally{
+                onLoadingChange(false)
               }
             }}
             disabled={isLoading}
