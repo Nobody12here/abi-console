@@ -29,8 +29,8 @@ export const AbiViewer = memo(function AbiViewer({ abi }: { abi: AbiFunction[] }
         <pre className="raw-abi">{JSON.stringify(abi, null, 2)}</pre>
       ) : (
         <div className="abi-list">
-          {abi.map((fn) => (
-            <div className="abi-item" key={fn.name}>
+          {abi.map((fn,idx) => (
+            <div className="abi-item" key={`${fn.name} ${idx}`}>
               <span className={cn("type-dot", fn.stateMutability)} />
               <span className="mono name">{fn.name}</span>
               <span className="mono signature">

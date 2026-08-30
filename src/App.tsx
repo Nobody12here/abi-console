@@ -168,9 +168,9 @@ function App() {
                 </div>
               </div>
               <div className="method-list">
-                {(tab === "read" ? readFns : writeFns).map((fn) => (
+                {(tab === "read" ? readFns : writeFns).map((fn,idx) => (
                   <FunctionCard
-                    key={fn.name}
+                    key={`${fn.name} ${idx}`}
                     fn={fn}
                     expanded={expanded === fn.name}
                     values={values[fn.name] ?? emptyValues}
