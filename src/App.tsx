@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import { Toaster, toast } from "react-hot-toast";
 import { AbiViewer } from "@/components/abi-viewer/AbiViewer";
 import { ContractImporter } from "@/components/contract-importer/ContractImporter";
 import { EmptyState } from "@/components/empty-state/EmptyState";
 import { FunctionCard } from "@/components/function-card/FunctionCard";
 import { Header } from "@/components/header/Header";
-import type { AbiInput, AbiFunction, Result } from "@/components/types";
+import type { AbiFunction, Result } from "@/components/types";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 
@@ -30,8 +30,6 @@ function App() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [results, setResults] = useState<Record<string, Result>>({});
   const [copied, setCopied] = useState(false);
-  const [toast, setToast] = useState("");
-  const toastTimer = useRef<number | undefined>(undefined);
   const readFns = useMemo(
     () =>
       (abi ?? []).filter(
@@ -48,29 +46,15 @@ function App() {
       ),
     [abi],
   );
-  const notify = useCallback((message: string) => {
-    if (toastTimer.current !== undefined) {
-      window.clearTimeout(toastTimer.current);
-    }
-    setToast(message);
-    toastTimer.current = window.setTimeout(() => setToast(""), 2600);
+
+  const loadAbi = useCallback((nextAbi: AbiFunction[]) => {
+    setAbi(nextAbi);
+    setExpanded(null);
+    setResults({});
+    toast(`ABI loaded - ${nextAbi.length} functions found`, {
+      duration: 2000,
+    });
   }, []);
-  useEffect(() => {
-    return () => {
-      if (toastTimer.current !== undefined) {
-        window.clearTimeout(toastTimer.current);
-      }
-    };
-  }, []);
-  const loadAbi = useCallback(
-    (nextAbi: AbiFunction[]) => {
-      setAbi(nextAbi);
-      setExpanded(null);
-      setResults({});
-      notify(`ABI loaded - ${nextAbi.length} functions found`);
-    },
-    [notify],
-  );
   const parseAbi = useCallback(() => {
     try {
       const parsed = JSON.parse(paste) as AbiFunction[];
@@ -145,6 +129,7 @@ function App() {
               setError("");
             }}
             onError={(error: string) => {
+              loadAbi([]);
               setError(error);
             }}
             onParse={parseAbi}
@@ -206,12 +191,7 @@ function App() {
           <Spinner />
         </div>
       )}
-      {toast && (
-        <div className="toast">
-          <Check size={15} />
-          {toast}
-        </div>
-      )}
+      <Toaster position="bottom-center" />
     </div>
   );
 }

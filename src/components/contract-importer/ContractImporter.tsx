@@ -17,12 +17,12 @@ type ImportMode = "address" | "paste" | "upload";
 type ContractImporterProps = {
   abi: AbiFunction[] | null;
   importMode: ImportMode;
-  isLoading:boolean;
+  isLoading: boolean;
   address: string;
   paste: string;
   error: string;
   copied: boolean;
-  onLoadingChange: (loading:boolean) => void;
+  onLoadingChange: (loading: boolean) => void;
   onModeChange: (mode: ImportMode) => void;
   onAddressChange: (address: string) => void;
   onPasteChange: (paste: string) => void;
@@ -78,7 +78,7 @@ export function ContractImporter({
         </div>
         {abi && (
           <span className="loaded">
-            <Check size={13} /> ABI loaded
+            <Check size={13} strokeWidth={2.2} /> ABI loaded
           </span>
         )}
       </div>
@@ -93,37 +93,39 @@ export function ContractImporter({
           </button>
         ))}
       </div>
+      <div className="form-stack mb-2">
+        <label className="field-label" htmlFor="contract-address">
+          CONTRACT ADDRESS
+        </label>
+        <input
+          id="contract-address"
+          value={address}
+          onChange={(event) => onAddressChange(event.target.value)}
+          placeholder="0x... contract address"
+          className="field mono"
+        />
+      </div>
+
       {importMode === "address" && (
         <div className="form-stack">
-          <label className="field-label" htmlFor="contract-address">
-            CONTRACT ADDRESS
-          </label>
-          <input
-            id="contract-address"
-            value={address}
-            onChange={(event) => onAddressChange(event.target.value)}
-            placeholder="0x... contract address"
-            className="field mono"
-          />
           <Button
             className="action-button"
             onClick={async () => {
               let abi: AbiFunction[] = [];
-              onLoadingChange(true)
+              onLoadingChange(true);
               try {
                 abi = (await fetchContractABI(address)) as AbiFunction[];
                 onFetch(abi);
               } catch (e) {
                 onError(e instanceof Error ? e.message : "Unknown Error");
-              }
-              finally{
-                onLoadingChange(false)
+              } finally {
+                onLoadingChange(false);
               }
             }}
             disabled={isLoading}
           >
-            <Zap size={15} />
-            Fetch ABI <ChevronRight size={15} />
+            <Zap size={15} strokeWidth={2.1} />
+            Fetch ABI <ChevronRight size={15} strokeWidth={2.1} />
           </Button>
         </div>
       )}
@@ -139,22 +141,26 @@ export function ContractImporter({
             placeholder='[{"type":"function","name":"balanceOf"}]'
             className="field mono textarea"
           />
-          <Button className="action-button" onClick={onParse}>
-            <Braces size={15} />
+          <Button
+            className="action-button"
+            onClick={onParse}
+            disabled={!address}
+          >
+            <Braces size={15} strokeWidth={2.1} />
             Parse ABI
           </Button>
         </div>
       )}
       {importMode === "upload" && (
-        <button className="upload-zone" onClick={onUpload}>
-          <Upload size={20} />
+        <button className="upload-zone" onClick={onUpload} disabled={!address}>
+          <Upload size={20} strokeWidth={1.9} />
           <span>Drop ABI JSON here</span>
           <small>or click to browse files</small>
         </button>
       )}
       {error && (
         <p className="error">
-          <CircleHelp size={14} />
+          <CircleHelp size={14} strokeWidth={2} />
           {error}
         </p>
       )}
@@ -163,7 +169,11 @@ export function ContractImporter({
           <span className="identicon" />
           <span className="mono">{address}</span>
           <button onClick={onCopyAddress} aria-label="Copy contract address">
-            {copied ? <Check size={14} /> : <Copy size={14} />}
+            {copied ? (
+              <Check size={14} strokeWidth={2.2} />
+            ) : (
+              <Copy size={14} strokeWidth={1.9} />
+            )}
           </button>
         </div>
       )}

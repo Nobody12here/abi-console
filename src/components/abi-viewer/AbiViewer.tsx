@@ -1,5 +1,5 @@
 import { memo, useState } from "react";
-import { Braces, FileJson } from "lucide-react";
+import { Braces, FileJson2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { AbiFunction } from "../types";
@@ -17,7 +17,11 @@ export const AbiViewer = memo(function AbiViewer({ abi }: { abi: AbiFunction[] }
           </h2>
         </div>
         <Button variant="ghost" size="sm" onClick={() => setRaw(!raw)}>
-          {raw ? <Braces size={14} /> : <FileJson size={14} />}
+          {raw ? (
+            <Braces size={14} strokeWidth={1.8} />
+          ) : (
+            <FileJson2 size={14} strokeWidth={1.8} />
+          )}
           {raw ? "Tree view" : "Edit JSON"}
         </Button>
       </div>
