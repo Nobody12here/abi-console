@@ -8,8 +8,14 @@ import { Header } from "@/components/header/Header";
 import type { AbiFunction, Result } from "@/components/types";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
-
+import {
+  readContract,
+  writeContract,
+  waitForTransactionReceipt,
+} from "@wagmi/core";
+import { config } from "./wagmiConfig";
 import "./App.css";
+import type { Address } from "viem";
 
 const emptyValues: Record<string, string> = {};
 
@@ -57,8 +63,18 @@ function App() {
   }, []);
   const parseAbi = useCallback(() => {
     try {
-      const parsed = JSON.parse(paste) as AbiFunction[];
-      const functions = parsed.filter((item) => item.type === "function");
+      const parsed = JSON.parse(paste) 
+      let functionArray:AbiFunction[];
+      if (Array.isArray(parsed)){
+        functionArray = parsed
+      } 
+      else if (parsed.abi &&Array.isArray(parsed.abi)){
+        functionArray = parsed.abi;
+      }
+      else {
+        throw new Error("Invalid ABI")
+      }
+      const functions = functionArray.filter((item) => item.type === "function");
       if (!functions.length) throw new Error();
       loadAbi(functions);
       setError("");
@@ -66,7 +82,57 @@ function App() {
       setError("Paste a valid ABI JSON array with function entries.");
     }
   }, [loadAbi, paste]);
-  
+
+  const runFunction = useCallback(
+    async (fn: AbiFunction, isWrite: boolean) => {
+      if (abi) {
+        try {
+          setIsLoading(true);
+
+          if (isWrite) {
+            const txHash = await writeContract(config, {
+              abi,
+              address: contractAddress as Address,
+              functionName: fn.name,
+              args: Object.values(values[fn.name] ?? {}) as any[],
+            });
+            const transactionReceipt = await waitForTransactionReceipt(config, {
+              hash: txHash,
+            });
+            setResults((prev) => ({
+              ...prev,
+              [fn.name]: {
+                value: String(
+                  `Transaction submitted. Txhash : ${transactionReceipt.transactionHash}`,
+                ),
+              },
+            }));
+          } else {
+            const result = await readContract(config, {
+              abi,
+              address: contractAddress as Address,
+              functionName: fn.name,
+              args: Object.values(values[fn.name] ?? {}) as any[],
+            });
+            setResults((prev) => ({
+              ...prev,
+              [fn.name]: {
+                value: String(result),
+              },
+            }));
+            console.log(result);
+          }
+        } catch (error) {
+          setError(
+            `Failed to call ${fn.name} : ${error instanceof Error ? error.message : "Unknown error"}`,
+          );
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    },
+    [abi, contractAddress, values],
+  );
   const copyAddress = useCallback(() => {
     void navigator.clipboard?.writeText(contractAddress);
     setCopied(true);
@@ -150,7 +216,7 @@ function App() {
                 </div>
               </div>
               <div className="method-list">
-                {(tab === "read" ? readFns : writeFns).map((fn,idx) => (
+                {(tab === "read" ? readFns : writeFns).map((fn, idx) => (
                   <FunctionCard
                     key={`${fn.name} ${idx}`}
                     id={`${fn.name} ${idx}`}
@@ -161,7 +227,7 @@ function App() {
                     isWrite={tab === "write"}
                     onToggle={toggleExpanded}
                     onChange={changeValue}
-                    onRun={() => console.log("RUN FUNCTION to be implemented")}
+                    onRun={runFunction}
                   />
                 ))}
               </div>
