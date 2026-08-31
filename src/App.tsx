@@ -66,25 +66,7 @@ function App() {
       setError("Paste a valid ABI JSON array with function entries.");
     }
   }, [loadAbi, paste]);
-  // const runFunction = useCallback(
-  //   (fn: AbiFunction, isWrite: boolean) => {
-  //     if (isWrite) {
-  //       notify(`${fn.name}() transaction submitted`);
-  //       return;
-  //     }
-  //     setResults((current) => ({
-  //       ...current,
-  //       [fn.name]: { value: "", loading: true },
-  //     }));
-  //     window.setTimeout(() => {
-  //       setResults((current) => ({
-  //         ...current,
-  //         [fn.name]: knownResults[fn.name] ?? { value: "0x8b5e...c912" },
-  //       }));
-  //     }, 450);
-  //   },
-  //   [notify],
-  // );
+  
   const copyAddress = useCallback(() => {
     void navigator.clipboard?.writeText(contractAddress);
     setCopied(true);
@@ -171,6 +153,7 @@ function App() {
                 {(tab === "read" ? readFns : writeFns).map((fn,idx) => (
                   <FunctionCard
                     key={`${fn.name} ${idx}`}
+                    id={`${fn.name} ${idx}`}
                     fn={fn}
                     expanded={expanded === fn.name}
                     values={values[fn.name] ?? emptyValues}
