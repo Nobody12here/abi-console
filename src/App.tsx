@@ -8,8 +8,10 @@ import { Header } from "@/components/header/Header";
 import type { AbiFunction, Result } from "@/components/types";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
-
+import { readContract } from "@wagmi/core";
+import { config } from "./wagmiConfig";
 import "./App.css";
+import type { Address } from "viem";
 
 const emptyValues: Record<string, string> = {};
 
@@ -66,25 +68,41 @@ function App() {
       setError("Paste a valid ABI JSON array with function entries.");
     }
   }, [loadAbi, paste]);
-  // const runFunction = useCallback(
-  //   (fn: AbiFunction, isWrite: boolean) => {
-  //     if (isWrite) {
-  //       notify(`${fn.name}() transaction submitted`);
-  //       return;
-  //     }
-  //     setResults((current) => ({
-  //       ...current,
-  //       [fn.name]: { value: "", loading: true },
-  //     }));
-  //     window.setTimeout(() => {
-  //       setResults((current) => ({
-  //         ...current,
-  //         [fn.name]: knownResults[fn.name] ?? { value: "0x8b5e...c912" },
-  //       }));
-  //     }, 450);
-  //   },
-  //   [notify],
-  // );
+
+  const runFunction = useCallback(
+    async (fn: AbiFunction, isWrite: boolean) => {
+      if (abi) {
+        try {
+          setIsLoading(true);
+
+          if (isWrite) {
+            console.log("write function to be implemented !");
+          }
+          const result = await readContract(config, {
+            abi,
+            address: contractAddress as Address,
+            functionName: fn.name,
+            args: Object.values(values[fn.name] ?? {}) as any[],
+          });
+          setResults((prev) => ({
+            ...prev,
+            [fn.name]: {
+              value: String(result),
+              
+            },
+          }));
+          console.log(result);
+        } catch (error) {
+          toast.error(
+            `Failed to call ${fn.name} : ${error instanceof Error ? error.message : "Unknown error"}`,
+          );
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    },
+    [abi, contractAddress, values],
+  );
   const copyAddress = useCallback(() => {
     void navigator.clipboard?.writeText(contractAddress);
     setCopied(true);
@@ -168,7 +186,7 @@ function App() {
                 </div>
               </div>
               <div className="method-list">
-                {(tab === "read" ? readFns : writeFns).map((fn,idx) => (
+                {(tab === "read" ? readFns : writeFns).map((fn, idx) => (
                   <FunctionCard
                     key={`${fn.name} ${idx}`}
                     fn={fn}
@@ -178,7 +196,7 @@ function App() {
                     isWrite={tab === "write"}
                     onToggle={toggleExpanded}
                     onChange={changeValue}
-                    onRun={() => console.log("RUN FUNCTION to be implemented")}
+                    onRun={runFunction}
                   />
                 ))}
               </div>
