@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo } from "react";
 import { ChevronRight, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -6,7 +6,6 @@ import type { AbiFunction, Result } from "../types";
 import { useAccount } from "wagmi";
 type FunctionCardProps = {
   fn: AbiFunction;
-  id:string;
   expanded: boolean;
   values: Record<string, string>;
   result?: Result;
@@ -17,7 +16,6 @@ type FunctionCardProps = {
 };
 
 export const FunctionCard = memo(function FunctionCard({
-  id,
   fn,
   expanded,
   values,
