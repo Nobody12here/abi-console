@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import {
   readContract,
   writeContract,
+  simulateContract,
   waitForTransactionReceipt,
 } from "@wagmi/core";
 import { config } from "./wagmiConfig";
@@ -63,18 +64,18 @@ function App() {
   }, []);
   const parseAbi = useCallback(() => {
     try {
-      const parsed = JSON.parse(paste) 
-      let functionArray:AbiFunction[];
-      if (Array.isArray(parsed)){
-        functionArray = parsed
-      } 
-      else if (parsed.abi &&Array.isArray(parsed.abi)){
+      const parsed = JSON.parse(paste);
+      let functionArray: AbiFunction[];
+      if (Array.isArray(parsed)) {
+        functionArray = parsed;
+      } else if (parsed.abi && Array.isArray(parsed.abi)) {
         functionArray = parsed.abi;
+      } else {
+        throw new Error("Invalid ABI");
       }
-      else {
-        throw new Error("Invalid ABI")
-      }
-      const functions = functionArray.filter((item) => item.type === "function");
+      const functions = functionArray.filter(
+        (item) => item.type === "function",
+      );
       if (!functions.length) throw new Error();
       loadAbi(functions);
       setError("");
@@ -90,12 +91,13 @@ function App() {
           setIsLoading(true);
 
           if (isWrite) {
-            const txHash = await writeContract(config, {
+            const { request } = await simulateContract(config, {
               abi,
               address: contractAddress as Address,
               functionName: fn.name,
-              args: Object.values(values[fn.name] ?? {}) as any[],
+              args: Object.values(values[fn.name] ?? ({} as any[])),
             });
+            const txHash = await writeContract(config, request);
             const transactionReceipt = await waitForTransactionReceipt(config, {
               hash: txHash,
             });
@@ -219,7 +221,6 @@ function App() {
                 {(tab === "read" ? readFns : writeFns).map((fn, idx) => (
                   <FunctionCard
                     key={`${fn.name} ${idx}`}
-                    
                     fn={fn}
                     expanded={expanded === fn.name}
                     values={values[fn.name] ?? emptyValues}
