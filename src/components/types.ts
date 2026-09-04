@@ -15,3 +15,13 @@ export type Result = {
 };
 
 export type Network = { id: string; name: string; color: string };
+
+export type SavedContract = {
+  id: string;
+  name: string;
+  address: string;
+  networkId: string;
+  networkName: string;
+  abi: AbiFunction[];
+  updatedAt: string;
+};

@@ -19,12 +19,17 @@ type ContractImporterProps = {
   importMode: ImportMode;
   isLoading: boolean;
   address: string;
+  name: string;
+  networkId: string;
+  networks: Array<{ id: string; name: string }>;
   paste: string;
   error: string;
   copied: boolean;
   onLoadingChange: (loading: boolean) => void;
   onModeChange: (mode: ImportMode) => void;
   onAddressChange: (address: string) => void;
+  onNameChange: (name: string) => void;
+  onNetworkChange: (networkId: string) => void;
   onPasteChange: (paste: string) => void;
   onFetch: (abi: AbiFunction[]) => void;
   onError: (error: string) => void;
@@ -55,6 +60,9 @@ export function ContractImporter({
   abi,
   importMode,
   address,
+  name,
+  networkId,
+  networks,
   paste,
   error,
   copied,
@@ -62,6 +70,8 @@ export function ContractImporter({
   onLoadingChange,
   onModeChange,
   onAddressChange,
+  onNameChange,
+  onNetworkChange,
   onPasteChange,
   onFetch,
   onError,
@@ -94,6 +104,18 @@ export function ContractImporter({
         ))}
       </div>
       <div className="form-stack mb-2">
+        <label className="field-label" htmlFor="contract-name">
+          CONTRACT NAME
+        </label>
+        <input
+          id="contract-name"
+          value={name}
+          onChange={(event) => onNameChange(event.target.value)}
+          placeholder="e.g. Treasury"
+          className="field"
+        />
+      </div>
+      <div className="form-stack mb-2">
         <label className="field-label" htmlFor="contract-address">
           CONTRACT ADDRESS
         </label>
@@ -104,6 +126,23 @@ export function ContractImporter({
           placeholder="0x... contract address"
           className="field mono"
         />
+      </div>
+      <div className="form-stack mb-2">
+        <label className="field-label" htmlFor="contract-network">
+          NETWORK
+        </label>
+        <select
+          id="contract-network"
+          value={networkId}
+          onChange={(event) => onNetworkChange(event.target.value)}
+          className="field"
+        >
+          {networks.map((network) => (
+            <option key={network.id} value={network.id}>
+              {network.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       {importMode === "address" && (
