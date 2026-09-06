@@ -1,12 +1,7 @@
 import { memo } from "react";
-import { Braces, FileJson } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Braces } from "lucide-react";
 
-export const EmptyState = memo(function EmptyState({
-  onLoad,
-}: {
-  onLoad: () => void;
-}) {
+export const EmptyState = memo(function EmptyState() {
   return (
     <div className="empty-state">
       <div className="empty-icon">
@@ -18,15 +13,6 @@ export const EmptyState = memo(function EmptyState({
         Fetch an ABI by address, paste your JSON, or upload a local file. The
         console will generate an interface for every read and write method.
       </p>
-      <Button
-        className="demo-button"
-        variant="outline"
-        aria-label="Load Demo contract"
-        onClick={onLoad}
-      >
-        <FileJson size={15} />
-        Load demo contract
-      </Button>
     </div>
   );
 });

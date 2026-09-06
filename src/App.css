@@ -675,7 +675,11 @@ svg {
   display: flex;
   gap: 22px;
   overflow-x: auto;
+  scrollbar-width: none;
   border-bottom: 1px solid var(--line);
+}
+.detail-tabs::-webkit-scrollbar {
+  display: none;
 }
 .detail-tabs button {
   position: relative;
