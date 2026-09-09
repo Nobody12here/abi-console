@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { Toaster, toast } from "react-hot-toast";
 import {
   ArrowLeft,
@@ -18,7 +18,7 @@ import { FunctionCard } from "@/components/function-card/FunctionCard";
 import { Header } from "@/components/header/Header";
 import type { AbiFunction, Result, SavedContract } from "@/components/types";
 import { Spinner } from "@/components/ui/spinner";
-import { cn } from "@/lib/utils";
+import { cn, formatContractError, shortenAddress } from "@/lib/utils";
 import {
   readContract,
   writeContract,
@@ -39,45 +39,6 @@ const networks = [
   { id: "42161", name: "Arbitrum One" },
   { id: "8453", name: "Base" },
 ];
-
-const shortenAddress = (address: string) =>
-  address.length > 12
-    ? `${address.slice(0, 6)}...${address.slice(-4)}`
-    : address;
-
-const formatContractError = (
-  error: unknown,
-  functionName: string,
-  isWrite: boolean,
-) => {
-  if (!(error instanceof Error)) {
-    return `${isWrite ? "Write" : "Read"} ${functionName} failed: Unknown error`;
-  }
-
-  const viemError = error as Error & {
-    shortMessage?: string;
-    details?: string;
-    docs?: string;
-    metaMessages?: string[];
-  };
-  const reason = viemError.shortMessage ?? error.message;
-  const lines = [
-    `${isWrite ? "Write" : "Read"} ${functionName} failed`,
-    `Reason: ${reason}`,
-  ];
-
-  if (viemError.details && viemError.details !== reason) {
-    lines.push(`Details: ${viemError.details}`);
-  }
-  if (viemError.metaMessages?.length) {
-    lines.push(...viemError.metaMessages);
-  }
-  if (viemError.docs) {
-    lines.push(`Docs: ${viemError.docs}`);
-  }
-
-  return lines.join("\n");
-};
 
 function App() {
   const [abi, setAbi] = useState<AbiFunction[] | null>(null);
@@ -286,6 +247,35 @@ function App() {
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1200);
   }, []);
+  const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    try {
+      const parsed = JSON.parse(await file.text());
+      const functionArray = Array.isArray(parsed) ? parsed : parsed.abi;
+      const functions = Array.isArray(functionArray)
+        ? functionArray.filter((item) => item.type === "function")
+        : [];
+
+      if (!functions.length) {
+        throw new Error("The selected file does not contain ABI functions.");
+      }
+
+      setPaste(JSON.stringify(parsed));
+      loadAbi(functions);
+      saveContract(functions);
+      setError("");
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Upload a valid ABI JSON file.",
+      );
+    }
+  };
+
   const toggleExpanded = useCallback((functionName: string) => {
     setExpanded((current) => (current === functionName ? null : functionName));
   }, []);
@@ -419,7 +409,7 @@ function App() {
                 setError(error);
               }}
               onParse={parseAbi}
-              onUpload={() => console.log("upload needs to be worked on ")}
+              onUpload={handleFileChange}
               onCopyAddress={copyAddress}
             />
             {abi && <AbiViewer abi={abi} />}

@@ -12,6 +12,7 @@ import type { AbiFunction } from "../types";
 import { cn } from "@/lib/utils";
 import { config } from "@/wagmiConfig";
 import { getChainId } from "@wagmi/core";
+import type { ChangeEvent } from "react";
 type ImportMode = "address" | "paste" | "upload";
 
 type ContractImporterProps = {
@@ -34,7 +35,7 @@ type ContractImporterProps = {
   onFetch: (abi: AbiFunction[]) => void;
   onError: (error: string) => void;
   onParse: () => void;
-  onUpload: () => void;
+  onUpload: (event: ChangeEvent<HTMLInputElement>) => void;
   onCopyAddress: () => void;
 };
 
@@ -191,11 +192,16 @@ export function ContractImporter({
         </div>
       )}
       {importMode === "upload" && (
-        <button className="upload-zone" onClick={onUpload} disabled={!address}>
+        <label className="upload-zone">
+          <input
+            type="file"
+            accept=".json,application/json"
+            onChange={onUpload}
+          />
           <Upload size={20} strokeWidth={1.9} />
           <span>Drop ABI JSON here</span>
           <small>or click to browse files</small>
-        </button>
+        </label>
       )}
       {error && (
         <p className="error">
