@@ -30,10 +30,12 @@ import {
   writeContract,
   simulateContract,
   waitForTransactionReceipt,
+  switchChain,
 } from "@wagmi/core";
 import { config } from "./wagmiConfig";
 import "./App.css";
 import type { Address } from "viem";
+import { useAccount } from "wagmi";
 
 const emptyValues: Record<string, string> = {};
 const storageKey = "abi-console-contracts";
@@ -43,6 +45,7 @@ function App() {
   const [importMode, setImportMode] = useState<"address" | "paste" | "upload">(
     "address",
   );
+  const { chainId, isConnected } = useAccount();
   const [contractAddress, setContractAddress] = useState("");
   const [contractName, setContractName] = useState("");
   const [networkId, setNetworkId] = useState<number>(config.chains[0].id);
@@ -82,6 +85,16 @@ function App() {
   const selectedNetwork =
     config.chains.find((network) => network.id === networkId) ??
     config.chains[0];
+  const contractChainId = selectedContract?.networkId ?? networkId;
+  const chainMismatch =
+    isConnected && chainId !== undefined && contractChainId !== chainId;
+  useEffect(() => {
+    if (!isConnected) return;
+    if (chainId === contractChainId) return;
+    switchChain(config, {
+      chainId: selectedNetwork.id,
+    });
+  }, [selectedNetwork, selectedContractId]);
   const readFns = useMemo(
     () =>
       (abi ?? []).filter(
@@ -193,10 +206,12 @@ function App() {
               address: contractAddress as Address,
               functionName: fn.name,
               args: Object.values(values[fn.name] ?? ({} as any[])),
+              chainId: contractChainId as (typeof config.chains)[number]["id"],
             });
             const txHash = await writeContract(config, request);
             const transactionReceipt = await waitForTransactionReceipt(config, {
               hash: txHash,
+              chainId: contractChainId as (typeof config.chains)[number]["id"],
             });
             setResults((prev) => ({
               ...prev,
@@ -221,6 +236,7 @@ function App() {
               address: contractAddress as Address,
               functionName: fn.name,
               args: Object.values(values[fn.name] ?? {}) as any[],
+              chainId: contractChainId as (typeof config.chains)[number]["id"],
             });
             setResults((prev) => ({
               ...prev,
