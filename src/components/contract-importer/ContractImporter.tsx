@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { config } from "@/wagmiConfig";
 import { getChainId } from "@wagmi/core";
 import type { ChangeEvent } from "react";
+import { type Chain } from 'viem'
 type ImportMode = "address" | "paste" | "upload";
 
 type ContractImporterProps = {
@@ -20,15 +21,15 @@ type ContractImporterProps = {
   isLoading: boolean;
   address: string;
   name: string;
-  networkId: string;
-  networks: Array<{ id: string; name: string }>;
+  networkId: number;
+  networks:Chain[];
   paste: string;
   error: string;
   onLoadingChange: (loading: boolean) => void;
   onModeChange: (mode: ImportMode) => void;
   onAddressChange: (address: string) => void;
   onNameChange: (name: string) => void;
-  onNetworkChange: (networkId: string) => void;
+  onNetworkChange: (networkId: number) => void;
   onPasteChange: (paste: string) => void;
   onFetch: (abi: AbiFunction[]) => void;
   onError: (error: string) => void;
@@ -132,7 +133,7 @@ export function ContractImporter({
         <select
           id="contract-network"
           value={networkId}
-          onChange={(event) => onNetworkChange(event.target.value)}
+          onChange={(event) => onNetworkChange(parseInt(event.target.value))}
           className="field"
         >
           {networks.map((network) => (

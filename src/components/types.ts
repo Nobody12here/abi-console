@@ -20,7 +20,7 @@ export type SavedContract = {
   id: string;
   name: string;
   address: string;
-  networkId: string;
+  networkId: number;
   networkName: string;
   abi: AbiFunction[];
   updatedAt: string;

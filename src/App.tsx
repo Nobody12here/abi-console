@@ -37,14 +37,6 @@ import type { Address } from "viem";
 
 const emptyValues: Record<string, string> = {};
 const storageKey = "abi-console-contracts";
-const networks = [
-  { id: "11155111", name: "Ethereum Sepolia" },
-  { id: "1", name: "Ethereum Mainnet" },
-  { id: "137", name: "Polygon" },
-  { id: "10", name: "Optimism" },
-  { id: "42161", name: "Arbitrum One" },
-  { id: "8453", name: "Base" },
-];
 
 function App() {
   const [abi, setAbi] = useState<AbiFunction[] | null>(null);
@@ -53,7 +45,7 @@ function App() {
   );
   const [contractAddress, setContractAddress] = useState("");
   const [contractName, setContractName] = useState("");
-  const [networkId, setNetworkId] = useState(networks[0].id);
+  const [networkId, setNetworkId] = useState<number>(config.chains[0].id);
   const [paste, setPaste] = useState("");
   const [error, setError] = useState("");
   const [dark, setDark] = useState(true);
@@ -88,7 +80,8 @@ function App() {
   const selectedContract =
     contracts.find((contract) => contract.id === selectedContractId) ?? null;
   const selectedNetwork =
-    networks.find((network) => network.id === networkId) ?? networks[0];
+    config.chains.find((network) => network.id === networkId) ??
+    config.chains[0];
   const readFns = useMemo(
     () =>
       (abi ?? []).filter(
@@ -394,7 +387,7 @@ function App() {
               address={contractAddress}
               name={contractName}
               networkId={networkId}
-              networks={networks}
+              networks={config.chains}
               isLoading={isLoading}
               paste={paste}
               error={error}
