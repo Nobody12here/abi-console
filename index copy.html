@@ -1,0 +1,329 @@
+import os
+import sqlite3
+from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask_socketio import SocketIO, emit, join_room
+from werkzeug.security import generate_password_hash, check_password_hash
+
+app = Flask(__name__)
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-change-me')
+socketio = SocketIO(app, cors_allowed_origins='*')
+
+DB = 'chat.db'
+
+def get_db():
+    conn = sqlite3.connect(DB)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def init_db():
+    with get_db() as conn:
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL,
+                text TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        conn.commit()
+
+@app.route('/')
+def index():
+    if 'user' not in session:
+        return redirect(url_for('login'))
+    return redirect(url_for('chat'))
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        if not username or not password:
+            flash('Username and password required')
+            return redirect(url_for('register'))
+        if len(password) < 6:
+            flash('Password must be at least 6 characters')
+            return redirect(url_for('register'))
+        try:
+            with get_db() as conn:
+                conn.execute('INSERT INTO users (username, password_hash) VALUES (?, ?)',
+                             (username, generate_password_hash(password)))
+                conn.commit()
+        except sqlite3.IntegrityError:
+            flash('Username already taken')
+            return redirect(url_for('register'))
+        flash('Account created — please log in')
+        return redirect(url_for('login'))
+    return render_template('register.html')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        with get_db() as conn:
+            row = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
+        if row and check_password_hash(row['password_hash'], password):
+            session['user'] = username
+            return redirect(url_for('chat'))
+        flash('Invalid credentials')
+        return redirect(url_for('login'))
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    session.pop('user', None)
+    return redirect(url_for('login'))
+
+@app.route('/chat')
+def chat():
+    if 'user' not in session:
+        return redirect(url_for('login'))
+    with get_db() as conn:
+        rows = conn.execute('SELECT username, text, created_at FROM messages ORDER BY id ASC LIMIT 200').fetchall()
+    history = [dict(r) for r in rows]
+    return render_template('chat.html', user=session['user'], history=history)
+
+@socketio.on('send_message')
+def handle_message(data):
+    if 'user' not in session:
+        return
+    text = (data.get('text') or '').strip()
+    if not text or len(text) > 500:
+        return
+    username = session['user']
+    with get_db() as conn:
+        conn.execute('INSERT INTO messages (username, text) VALUES (?, ?)', (username, text))
+        conn.commit()
+    emit('new_message', {'username': username, 'text': text}, broadcast=True)
+
+if __name__ == '__main__':
+    init_db()
+    socketio.run(app, debug=True, host='127.0.0.1', port=5000)
+<!doctype html>
+<html>
+<head><title>Login</title></head>
+<body>
+  <h1>Login</h1>
+  {% with msgs = get_flashed_messages() %}
+    {% for m in msgs %}<p style="color:red">{{ m }}</p>{% endfor %}
+  {% endwith %}
+  <form method="post">
+    <input name="username" placeholder="Username" required><br>
+    <input name="password" type="password" placeholder="Password" required><br>
+    <button type="submit">Log in</button>
+  </form>
+  <p><a href="{{ url_for('register') }}">Create account</a></p>
+</body>
+</html>
+<!doctype html>
+<html>
+<head>
+  <title>Chat</title>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+</head>
+<body>
+  <h1>Chat — logged in as {{ user }}</h1>
+  <a href="{{ url_for('logout') }}">Logout</a>
+  <div id="messages" style="border:1px solid #ccc; height:300px; overflow-y:auto; padding:8px; margin-top:10px;">
+    {% for m in history %}
+      <div><b>{{ m.username }}</b>: {{ m.text }}</div>
+    {% endfor %}
+  </div>
+  <form id="form">
+    <input id="input" autocomplete="off" placeholder="Type a message..." style="width:70%">
+    <button type="submit">Send</button>
+  </form>
+  port os
+import sqlite3
+from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask_socketio import SocketIO, emit
+from werkzeug.security import generate_password_hash, check_password_hash
+
+app = Flask(__name__)
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'change-me-in-prod')
+socketio = SocketIO(app)
+
+DB = 'chat.db'
+
+
+def get_db():
+    conn = sqlite3.connect(DB)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_db():
+    with get_db() as conn:
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL
+            )
+        ''')
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL,
+                text TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        conn.commit()
+
+
+@app.route('/')
+def index():
+    return redirect(url_for('chat') if 'user' in session else url_for('login'))
+
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        if not username or len(password) < 6:
+            flash('Username required, password must be 6+ characters')
+            return redirect(url_for('register'))
+        try:
+            with get_db() as conn:
+                conn.execute(
+                    'INSERT INTO users (username, password_hash) VALUES (?, ?)',
+                    (username, generate_password_hash(password))
+                )
+                conn.commit()
+        except sqlite3.IntegrityError:
+            flash('Username already taken')
+            return redirect(url_for('register'))
+        flash('Account created — please log in')
+        return redirect(url_for('login'))
+    return render_template('register.html')
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        with get_db() as conn:
+            row = conn.execute(
+                'SELECT * FROM users WHERE username = ?', (username,)
+            ).fetchone()
+        if row and check_password_hash(row['password_hash'], password):
+            session['user'] = username
+            return redirect(url_for('chat'))
+        flash('Invalid credentials')
+        return redirect(url_for('login'))
+    return render_template('login.html')
+
+
+@app.route('/logout')
+def logout():
+    session.pop('user', None)
+    return redirect(url_for('login'))
+
+
+@app.route('/chat')
+def chat():
+    if 'user' not in session:
+        return redirect(url_for('login'))
+    with get_db() as conn:
+        rows = conn.execute(
+            'SELECT username, text FROM messages ORDER BY id ASC LIMIT 200'
+        ).fetchall()
+    return render_template('chat.html', user=session['user'],
+                           history=[dict(r) for r in rows])
+
+
+@socketio.on('send_message')
+def handle_message(data):
+    if 'user' not in session:
+        return
+    text = (data.get('text') or '').strip()
+    if not text or len(text) > 500:
+        return
+    username = session['user']
+    with get_db() as conn:
+        conn.execute('INSERT INTO messages (username, text) VALUES (?, ?)',
+                     (username, text))
+        conn.commit()
+    emit('new_message', {'username': username, 'text': text}, broadcast=True)
+
+
+if __name__ == '__main__':
+    init_db()
+    socketio.run(app, debug=True, host='127.0.0.1', port=5000)
+    <!doctype html>
+<html>
+<head><title>Login</title></head>
+<body>
+  <h1>Login</h1>
+  {% for m in get_flashed_messages() %}<p style="color:red">{{ m }}</p>{% endfor %}
+  <form method="post">
+    <input name="username" placeholder="Username" required><br><br>
+    <input name="password" type="password" placeholder="Password" required><br><br>
+    <button type="submit">Log in</button>
+  </form>
+  <p><a href="{{ url_for('register') }}">Create account</a></p>
+</body>
+</html>
+<!doctype html>
+<html>
+<head>
+  <title>Chat</title>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+</head>
+<body>
+  <h1>Chat — logged in as {{ user }}</h1>
+  <a href="{{ url_for('logout') }}">Logout</a>
+
+  <div id="messages" style="border:1px solid #ccc; height:320px; overflow-y:auto; padding:8px; margin-top:10px;">
+    {% for m in history %}
+      <div><b>{{ m.username }}</b>: {{ m.text }}</div>
+    {% endfor %}
+  </div>
+
+  <form id="form" style="margin-top:10px;">
+    <input id="input" autocomplete="off" placeholder="Type a message..." style="width:70%">
+    <button type="submit">Send</button>
+  </form>
+
+  <script>
+    const socket = io();
+    const box = document.getElementById('messages');
+    const form = document.getElementById('form');
+    const input = document.getElementById('input');
+
+    box.scrollTop = box.scrollHeight;
+
+    function addMessage(m) {
+      const div = document.createElement('div');
+      const b = document.createElement('b');
+      b.textContent = m.username;
+      div.appendChild(b);
+      div.appendChild(document.createTextNode(': ' + m.text));
+      box.appendChild(div);
+      box.scrollTop = box.scrollHeight;
+    }
+
+    socket.on('new_message', addMessage);
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+      socket.emit('send_message', { text });
+      input.value = '';
+    });
+  </script>
+</body>
+</html>

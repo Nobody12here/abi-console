@@ -3,7 +3,6 @@ import {
   Check,
   ChevronRight,
   CircleHelp,
-  Copy,
   Upload,
   Zap,
 } from "lucide-react";
@@ -25,7 +24,6 @@ type ContractImporterProps = {
   networks: Array<{ id: string; name: string }>;
   paste: string;
   error: string;
-  copied: boolean;
   onLoadingChange: (loading: boolean) => void;
   onModeChange: (mode: ImportMode) => void;
   onAddressChange: (address: string) => void;
@@ -66,7 +64,6 @@ export function ContractImporter({
   networks,
   paste,
   error,
-  copied,
   isLoading,
   onLoadingChange,
   onModeChange,
@@ -214,11 +211,9 @@ export function ContractImporter({
           <span className="identicon" />
           <span className="mono">{address}</span>
           <button onClick={onCopyAddress} aria-label="Copy contract address">
-            {copied ? (
+          
               <Check size={14} strokeWidth={2.2} />
-            ) : (
-              <Copy size={14} strokeWidth={1.9} />
-            )}
+            
           </button>
         </div>
       )}

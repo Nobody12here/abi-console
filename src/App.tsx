@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ChangeEvent,
+} from "react";
 import { Toaster, toast } from "react-hot-toast";
 import {
   ArrowLeft,
@@ -57,7 +63,6 @@ function App() {
   );
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [results, setResults] = useState<Record<string, Result>>({});
-  const [copied, setCopied] = useState(false);
   const [contracts, setContracts] = useState<SavedContract[]>(() => {
     try {
       return JSON.parse(
@@ -244,9 +249,10 @@ function App() {
   );
   const copyAddress = useCallback(() => {
     void navigator.clipboard?.writeText(contractAddress);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1200);
-  }, []);
+    toast("Address Copied", {
+      duration: 2000,
+    });
+  }, [contractAddress]);
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -392,7 +398,6 @@ function App() {
               isLoading={isLoading}
               paste={paste}
               error={error}
-              copied={copied}
               onLoadingChange={setIsLoading}
               onModeChange={setImportMode}
               onAddressChange={setContractAddress}
