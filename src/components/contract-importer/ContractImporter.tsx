@@ -45,9 +45,9 @@ const modes: Array<[ImportMode, string]> = [
 ];
 const ETHERSCAN_API_URL = import.meta.env.VITE_ETHERSCAN_ABI_API;
 
-const fetchContractABI = async (address: string) => {
+const fetchContractABI = async (address: string,chainid:number) => {
   const res = await fetch(
-    `${ETHERSCAN_API_URL}&module=contract&action=getabi&chainid=${getChainId(config)}&address=${address}`,
+    `${ETHERSCAN_API_URL}&module=contract&action=getabi&chainid=${chainid}&address=${address}`,
   );
   if (!res.ok) throw new Error("Error fetching contract ABI...");
   let data = await res.json();
@@ -152,7 +152,7 @@ export function ContractImporter({
               let abi: AbiFunction[] = [];
               onLoadingChange(true);
               try {
-                abi = (await fetchContractABI(address)) as AbiFunction[];
+                abi = (await fetchContractABI(address,networkId)) as AbiFunction[];
                 onFetch(abi);
               } catch (e) {
                 onError(e instanceof Error ? e.message : "Unknown Error");
