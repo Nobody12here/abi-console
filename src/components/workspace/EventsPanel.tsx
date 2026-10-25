@@ -288,8 +288,11 @@ export function EventsPanel({
                   <span className="hint">
                     {event.inputs.filter((input) => input.indexed).length} indexed
                   </span>
-                  <span className="method-selector mono">
-                    {topic0.slice(0, 10)}…
+                  <span
+                    className="method-selector mono"
+                    title={`Topic 0 hash ${topic0}`}
+                  >
+                    topic0 {topic0.slice(0, 10)}…
                   </span>
                 </span>
               </button>

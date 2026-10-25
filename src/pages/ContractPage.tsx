@@ -270,13 +270,16 @@ export function ContractPage() {
         )}
       </div>
 
-      <div className="workspace-footnote">
-        <AlertTriangle size={13} />
-        <span>
-          The ABI hash proves what you imported, not that it matches the
-          deployed bytecode. Always review calldata and simulate before signing.
-        </span>
-      </div>
+      {tab !== "overview" && (
+        <div className="workspace-footnote">
+          <AlertTriangle size={13} />
+          <span>
+            The ABI hash proves what you imported, not that it matches the
+            deployed bytecode. Always review calldata and simulate before
+            signing.
+          </span>
+        </div>
+      )}
     </div>
   );
 }

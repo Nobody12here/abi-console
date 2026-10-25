@@ -31,6 +31,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { ChainBadge } from "@/components/ui/ChainBadge";
+import { Spinner } from "@/components/ui/Spinner";
 
 type RpcStatus =
   | { state: "idle" }
@@ -63,6 +64,7 @@ function Switch({
 
 export function SettingsPage() {
   const {
+    ready,
     settings,
     bindings,
     revisions,
@@ -96,6 +98,15 @@ export function SettingsPage() {
   const [clearOpen, setClearOpen] = useState(false);
   const [clearWord, setClearWord] = useState("");
   const importRef = useRef<HTMLInputElement>(null);
+
+  if (!ready) {
+    return (
+      <div className="page-loading">
+        <Spinner label="Loading workspace" />
+        <span>Loading local workspace…</span>
+      </div>
+    );
+  }
 
   const saveKey = () => {
     updateSettings({ etherscanKey: keyDraft.trim() });
@@ -479,15 +490,17 @@ export function SettingsPage() {
           <div className="data-stats">
             <div>
               <strong>{bindings.length}</strong>
-              <span>Contracts</span>
+              <span>{bindings.length === 1 ? "Contract" : "Contracts"}</span>
             </div>
             <div>
               <strong>{revisions.length}</strong>
-              <span>ABI revisions</span>
+              <span>
+                {revisions.length === 1 ? "ABI revision" : "ABI revisions"}
+              </span>
             </div>
             <div>
               <strong>{txs.length}</strong>
-              <span>Transactions</span>
+              <span>{txs.length === 1 ? "Transaction" : "Transactions"}</span>
             </div>
           </div>
 

@@ -35,7 +35,7 @@ import { createReadClient } from "@/lib/rpc";
 import { inspectContract } from "@/lib/proxy";
 import { fetchAbiFromUrl, fetchExplorerAbi } from "@/lib/explorer";
 import { errorMessage } from "@/features/execution/errors";
-import { absoluteTime, shortHash, shortSignature } from "@/lib/format";
+import { shortHash } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -99,7 +99,6 @@ export function ImportPage() {
   const [sourceKind, setSourceKind] = useState<SourceKind>(() =>
     parseSource(params.get("source")),
   );
-  const [openedAt] = useState(() => new Date().toISOString());
   const [imported, setImported] = useState<ImportedAbi | null>(null);
   const [abiSource, setAbiSource] = useState<AbiSource | null>(null);
   const [sourceError, setSourceError] = useState<string[]>([]);
@@ -337,7 +336,7 @@ export function ImportPage() {
 
       <dl className="abi-summary-grid">
         <div>
-          <dt>Hash</dt>
+          <dt>ABI hash</dt>
           <dd className="mono">
             {shortHash(imported.hash, 10)}
             <CopyButton value={imported.hash} label="Copy ABI hash" compact />
@@ -371,11 +370,6 @@ export function ImportPage() {
           ))}
         </div>
       )}
-
-      <div className="abi-summary-foot">
-        <span className="mono">{shortSignature(imported.hash, 42)}</span>
-        <Badge tone="muted">JSON preserved</Badge>
-      </div>
     </div>
   ) : (
     <div className="abi-summary is-empty">
@@ -424,9 +418,7 @@ export function ImportPage() {
     }
     return (
       <p className="check-line success">
-        <ShieldCheck size={14} /> Contract found ·{" "}
-        {codeQuery.data?.codeSize ?? 0} bytes ·{" "}
-        {codeQuery.data?.proxy ? "proxy detected" : "no proxy detected"}
+        <ShieldCheck size={14} /> Contract code found
       </p>
     );
   })();
@@ -751,9 +743,13 @@ export function ImportPage() {
                 {codeQuery.data.proxy.kind.replace("eip", "EIP-")}
                 {"implementation" in codeQuery.data.proxy &&
                   codeQuery.data.proxy.implementation && (
-                    <span className="mono">
+                    <span
+                      className="mono"
+                      title={`Proxy implementation ${codeQuery.data.proxy.implementation}`}
+                    >
                       {" "}
-                      → {shortHash(codeQuery.data.proxy.implementation, 6)}
+                      · implementation{" "}
+                      {shortHash(codeQuery.data.proxy.implementation, 6)}
                     </span>
                   )}
               </p>
@@ -766,7 +762,8 @@ export function ImportPage() {
                 <p className="eyebrow">EXISTING BINDING</p>
                 <strong>{existing.name}</strong>
                 <small>
-                  Current ABI {existingRevision ? shortHash(existingRevision.hash, 8) : "unknown"}
+                  Current ABI hash{" "}
+                  {existingRevision ? shortHash(existingRevision.hash, 8) : "unknown"}
                 </small>
               </div>
               <Button
@@ -787,7 +784,7 @@ export function ImportPage() {
             <p className="eyebrow">STEP 03 · REVIEW</p>
             <dl className="review-list">
               <div>
-                <dt>ABI</dt>
+                <dt>ABI hash</dt>
                 <dd>
                   {imported ? (
                     <span className="mono">{shortHash(imported.hash, 9)}</span>
@@ -811,13 +808,15 @@ export function ImportPage() {
               <div>
                 <dt>Code</dt>
                 <dd>
-                  {codeQuery.isLoading
-                    ? "Checking…"
-                    : codeQuery.data?.codeSize
-                      ? "Contract present"
-                      : codeQuery.isError
-                        ? "Unverified (RPC error)"
-                        : "Missing"}
+                  {!normalizedAddress
+                    ? "Not checked"
+                    : codeQuery.isLoading
+                      ? "Checking…"
+                      : codeQuery.data?.codeSize
+                        ? "Contract present"
+                        : codeQuery.isError
+                          ? "Unverified (RPC error)"
+                          : "No code"}
                 </dd>
               </div>
             </dl>
@@ -868,7 +867,6 @@ export function ImportPage() {
           The ABI hash is computed locally and stored with this contract
           revision. It is derived from the exact JSON you imported.
         </span>
-        <span className="mono">{absoluteTime(openedAt)}</span>
       </div>
     </div>
   );

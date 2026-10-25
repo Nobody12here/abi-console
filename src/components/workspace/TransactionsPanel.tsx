@@ -236,8 +236,8 @@ export function TransactionsPanel({
                   )}
                   {tx.hash && (
                     <span className="tx-hash-inline">
-                      Hash <code className="mono">{shortHash(tx.hash, 8)}</code>
-                      <CopyButton value={tx.hash} label="Copy hash" compact />
+                      Tx hash <code className="mono">{shortHash(tx.hash, 8)}</code>
+                      <CopyButton value={tx.hash} label="Copy transaction hash" compact />
                     </span>
                   )}
                 </div>

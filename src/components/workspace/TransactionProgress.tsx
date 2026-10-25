@@ -97,6 +97,7 @@ export function TransactionProgress({
 
       {txHash && (
         <div className="tx-hash-row">
+          <span className="hash-label">Tx hash</span>
           <span className="mono">{shortHash(txHash, 10)}</span>
           <CopyButton value={txHash} label="Copy transaction hash" compact />
           {explorer && (

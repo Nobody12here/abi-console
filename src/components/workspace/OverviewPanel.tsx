@@ -8,7 +8,6 @@ import {
   ExternalLink,
   FileCode2,
   Hash,
-  Layers,
   RefreshCw,
   ShieldAlert,
   ShieldCheck,
@@ -25,13 +24,12 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { CopyButton } from "@/components/ui/CopyButton";
 import { ChainBadge } from "@/components/ui/ChainBadge";
-import { sourceKindLabel, sourceLabel } from "@/features/abi/source";
+import { sourceLabel } from "@/features/abi/source";
 import { proxyLabel } from "@/features/abi/utils";
 import {
   absoluteTime,
   relativeTime,
   shortHash,
-  toJson,
 } from "@/lib/format";
 import {
   chainName,
@@ -116,34 +114,22 @@ export function OverviewPanel({
           </div>
 
           <div className="hash-block">
-            <span className="mono">{revision.hash}</span>
+            <Hash size={13} />
+            <span className="hash-label">ABI hash</span>
+            <span className="mono hash-value" title={revision.hash}>
+              {revision.hash}
+            </span>
             <CopyButton value={revision.hash} label="Copy ABI hash" compact />
           </div>
 
           <dl className="kv-list">
             <div>
               <dt>Source</dt>
-              <dd>
-                <span>{sourceLabel(revision.source)}</span>
-                <Badge tone="muted">{sourceKindLabel(revision.source)}</Badge>
-              </dd>
+              <dd>{sourceLabel(revision.source)}</dd>
             </div>
             <div>
               <dt>Imported</dt>
               <dd>{absoluteTime(revision.createdAt)}</dd>
-            </div>
-            <div>
-              <dt>Methods</dt>
-              <dd className="mono">
-                {revision.counts.readFunctions} read ·{" "}
-                {revision.counts.writeFunctions} write
-              </dd>
-            </div>
-            <div>
-              <dt>Events / errors</dt>
-              <dd className="mono">
-                {revision.counts.events} / {revision.counts.errors}
-              </dd>
             </div>
           </dl>
 
@@ -155,14 +141,6 @@ export function OverviewPanel({
                 {revision.warnings.length === 1 ? "" : "s"} — view them in the
                 ABI tab.
               </span>
-            </div>
-          )}
-
-          {revisions.length > 1 && (
-            <div className="revision-strip">
-              <Layers size={13} />
-              {revisions.length} stored revisions · active is{" "}
-              <span className="mono">{shortHash(revision.hash, 6)}</span>
             </div>
           )}
         </section>
@@ -210,7 +188,13 @@ export function OverviewPanel({
               <div>
                 <dt>Code hash</dt>
                 <dd className="mono hash-inline">
-                  {codeInfo ? shortHash(codeInfo.codeHash, 7) : "—"}
+                  {codeInfo ? (
+                    <span title={codeInfo.codeHash}>
+                      {shortHash(codeInfo.codeHash, 7)}
+                    </span>
+                  ) : (
+                    "—"
+                  )}
                   {codeInfo && (
                     <CopyButton
                       value={codeInfo.codeHash}
@@ -228,8 +212,11 @@ export function OverviewPanel({
                       <Badge tone="amber">{proxyLabel(codeInfo.proxy)}</Badge>
                       {"implementation" in codeInfo.proxy &&
                         codeInfo.proxy.implementation && (
-                          <span className="mono">
-                            {shortHash(codeInfo.proxy.implementation, 5)}
+                          <span
+                            className="mono"
+                            title={`Proxy implementation ${codeInfo.proxy.implementation}`}
+                          >
+                            impl {shortHash(codeInfo.proxy.implementation, 5)}
                           </span>
                         )}
                     </>
@@ -279,7 +266,6 @@ export function OverviewPanel({
               <p className="eyebrow">LOCAL ACTIVITY</p>
               <h2>Transactions</h2>
             </div>
-            <Badge tone={pending ? "amber" : "muted"}>{pending} pending</Badge>
           </div>
 
           <div className="activity-metrics">
@@ -337,14 +323,16 @@ export function OverviewPanel({
             </p>
           )}
 
-          <div className="card-actions">
-            <Link
-              to={`/contract/${binding.chainId}/${binding.address}/transactions`}
-              className="text-link"
-            >
-              View full history <ArrowUpRight size={12} />
-            </Link>
-          </div>
+          {txs.length > 0 && (
+            <div className="card-actions">
+              <Link
+                to={`/contract/${binding.chainId}/${binding.address}/transactions`}
+                className="text-link"
+              >
+                View full history <ArrowUpRight size={12} />
+              </Link>
+            </div>
+          )}
         </section>
 
         <section className="overview-card security-card">
@@ -363,10 +351,7 @@ export function OverviewPanel({
                 <CheckCircle2 size={14} /> Verified locally
               </h3>
               <ul>
-                <li>
-                  The ABI hash matches the exact JSON you imported (
-                  <span className="mono">{shortHash(revision.hash, 5)}</span>).
-                </li>
+                <li>The ABI hash matches the exact JSON you imported.</li>
                 <li>
                   {codeInfo?.codeSize
                     ? "Contract bytecode exists at this address."
@@ -385,11 +370,6 @@ export function OverviewPanel({
                 <li>That a successful simulation cannot revert on-chain.</li>
               </ul>
             </div>
-          </div>
-          <div className="security-foot">
-            <Hash size={13} />
-            <span className="mono">{toJson(revision.raw).length} chars of ABI</span>
-            <span>stored locally · never uploaded</span>
           </div>
         </section>
       </div>

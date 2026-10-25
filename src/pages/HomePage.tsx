@@ -103,14 +103,6 @@ export function HomePage() {
             >
               Import a contract
             </Button>
-            <Button
-              variant="ghost"
-              size="lg"
-              icon={<Braces size={16} />}
-              onClick={() => navigate("/import?source=paste")}
-            >
-              Paste an ABI
-            </Button>
           </div>
 
           <ul className="home-proof">
@@ -173,32 +165,33 @@ export function HomePage() {
             <ArrowRight size={15} />
           </Link>
 
-          <div className="source-index-note">
-            <ShieldCheck size={15} />
-            <p>
-              An ABI you import is data, not proof. This console shows the ABI
-              hash, the real selector, and calldata before anything is signed.
-            </p>
-          </div>
         </aside>
       </section>
 
       <section className="stat-strip" aria-label="Workspace summary">
         <div>
           <span className="stat-value">{bindings.length}</span>
-          <span className="stat-label">Contracts</span>
+          <span className="stat-label">
+            {bindings.length === 1 ? "Contract" : "Contracts"}
+          </span>
         </div>
         <div>
           <span className="stat-value">{methods}</span>
-          <span className="stat-label">Indexed methods</span>
+          <span className="stat-label">
+            {methods === 1 ? "Indexed method" : "Indexed methods"}
+          </span>
         </div>
         <div>
           <span className="stat-value">{chains}</span>
-          <span className="stat-label">Networks</span>
+          <span className="stat-label">
+            {chains === 1 ? "Network" : "Networks"}
+          </span>
         </div>
         <div>
           <span className="stat-value">{confirmed}</span>
-          <span className="stat-label">Confirmed writes</span>
+          <span className="stat-label">
+            {confirmed === 1 ? "Confirmed write" : "Confirmed writes"}
+          </span>
         </div>
         <div className="stat-strip-note">
           <span className="eyebrow">LAST ACTIVITY</span>
@@ -231,13 +224,6 @@ export function HomePage() {
                     aria-label="Search contracts"
                   />
                 </label>
-                <Button
-                  variant="secondary"
-                  icon={<Plus size={15} />}
-                  onClick={() => navigate("/import")}
-                >
-                  Add
-                </Button>
               </div>
             ) : undefined
           }
@@ -299,10 +285,9 @@ export function HomePage() {
         <div>
           <ShieldCheck size={16} />
           <p>
-            <strong>What this console can prove:</strong> the ABI hash you
-            imported, whether code exists at the address, and what calldata will
-            be sent. It cannot prove that the ABI matches the bytecode. Always
-            simulate and verify before signing.
+            <strong>ABI is data, not trust.</strong> This console shows the hash
+            you imported and the calldata you sign — not whether that ABI
+            matches the deployed bytecode.
           </p>
         </div>
         <Link to="/settings" className="text-link">

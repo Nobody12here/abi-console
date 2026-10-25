@@ -8,7 +8,6 @@ import {
   FilePenLine,
   Hash,
   History,
-  Layers,
   Search,
 } from "lucide-react";
 import toast from "react-hot-toast";
@@ -22,7 +21,7 @@ import {
   itemLabel,
   itemSignature,
 } from "@/features/abi/utils";
-import { sourceKindLabel, sourceLabel } from "@/features/abi/source";
+import { sourceLabel } from "@/features/abi/source";
 import { useWorkspace } from "@/features/workspace/WorkspaceProvider";
 import { errorMessage } from "@/features/execution/errors";
 import {
@@ -107,6 +106,10 @@ export function AbiPanel({
     [revisions],
   );
 
+  const activeIndex = orderedRevisions.findIndex(
+    (entry) => entry.id === revision.id,
+  );
+
   const saveRevision = () => {
     setIssues([]);
     let parsed: unknown;
@@ -144,18 +147,20 @@ export function AbiPanel({
       <section className="abi-identity">
         <div className="abi-identity-heading">
           <div>
-            <p className="eyebrow">ACTIVE ABI · REVISION</p>
-            <h2 className="mono hash-title">{shortHash(revision.hash, 12)}</h2>
+            <p className="eyebrow">ACTIVE ABI</p>
+            <h2>
+              Revision {Math.max(0, activeIndex) + 1} of{" "}
+              {orderedRevisions.length}
+            </h2>
           </div>
-          <Badge tone="teal">
-            <Layers size={11} /> {orderedRevisions.length} revision
-            {orderedRevisions.length === 1 ? "" : "s"}
-          </Badge>
         </div>
 
         <div className="hash-block">
           <Hash size={13} />
-          <span className="mono">{revision.hash}</span>
+          <span className="hash-label">ABI hash</span>
+          <span className="mono hash-value" title={revision.hash}>
+            {revision.hash}
+          </span>
           <CopyButton value={revision.hash} label="Copy ABI hash" compact />
         </div>
 
@@ -163,12 +168,7 @@ export function AbiPanel({
           <span>
             Source <strong>{sourceLabel(revision.source)}</strong>
           </span>
-          <Badge tone="muted">{sourceKindLabel(revision.source)}</Badge>
-          <span>{absoluteTime(revision.createdAt)}</span>
-          <span className="mono">
-            {revision.counts.functions} fn · {revision.counts.events} ev ·{" "}
-            {revision.counts.errors} err
-          </span>
+          <span>Imported {absoluteTime(revision.createdAt)}</span>
         </div>
 
         {revision.warnings.length > 0 && (
@@ -324,121 +324,123 @@ export function AbiPanel({
         )}
       </section>
 
-      <section className="abi-revisions">
-        <div className="panel-heading">
-          <div>
-            <p className="eyebrow">LOCAL HISTORY</p>
-            <h2>ABI revisions</h2>
+      {orderedRevisions.length > 1 && (
+        <section className="abi-revisions">
+          <div className="panel-heading">
+            <div>
+              <p className="eyebrow">LOCAL HISTORY</p>
+              <h2>ABI revisions</h2>
+            </div>
+            <Badge tone="muted">
+              <History size={11} /> {orderedRevisions.length} stored
+            </Badge>
           </div>
-          <Badge tone="muted">
-            <History size={11} /> {orderedRevisions.length} stored
-          </Badge>
-        </div>
-        <p className="hint">
-          Revisions are immutable. Activating one changes the interface used for
-          reads, writes, and log decoding without deleting any previous version.
-        </p>
+          <p className="hint">
+            Revisions are immutable. Activating one changes the interface used for
+            reads, writes, and log decoding without deleting any previous version.
+          </p>
 
-        <div className="revision-list">
-          {orderedRevisions.map((entry) => {
-            const active = entry.id === revision.id;
-            const entrySignatures = new Set(signaturesOf(entry.abi));
-            const added = active
-              ? []
-              : signaturesOf(entry.abi).filter(
-                  (signature) => !activeSignatures.has(signature),
-                );
-            const removed = active
-              ? []
-              : signaturesOf(revision.abi).filter(
-                  (signature) => !entrySignatures.has(signature),
-                );
+          <div className="revision-list">
+            {orderedRevisions.map((entry) => {
+              const active = entry.id === revision.id;
+              const entrySignatures = new Set(signaturesOf(entry.abi));
+              const added = active
+                ? []
+                : signaturesOf(entry.abi).filter(
+                    (signature) => !activeSignatures.has(signature),
+                  );
+              const removed = active
+                ? []
+                : signaturesOf(revision.abi).filter(
+                    (signature) => !entrySignatures.has(signature),
+                  );
 
-            return (
-              <article
-                key={entry.id}
-                className={cn("revision-card", active && "is-active")}
-              >
-                <div className="revision-head">
-                  <div>
-                    <span className="mono revision-hash" title={entry.hash}>
-                      {shortHash(entry.hash, 9)}
-                    </span>
-                    <span className="hint">
-                      {absoluteTime(entry.createdAt)} ·{" "}
-                      {sourceKindLabel(entry.source)}
-                    </span>
+              return (
+                <article
+                  key={entry.id}
+                  className={cn("revision-card", active && "is-active")}
+                >
+                  <div className="revision-head">
+                    <div>
+                      <span className="revision-source">
+                        {sourceLabel(entry.source)}
+                      </span>
+                      <span className="hint">
+                        {absoluteTime(entry.createdAt)}
+                      </span>
+                    </div>
+                    {active ? (
+                      <Badge tone="green">
+                        <Check size={11} /> Active
+                      </Badge>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => {
+                          setActiveRevision(contract.id, entry.id);
+                          toast.success("ABI revision activated.");
+                        }}
+                      >
+                        Activate
+                      </Button>
+                    )}
                   </div>
-                  {active ? (
-                    <Badge tone="green">
-                      <Check size={11} /> Active
-                    </Badge>
-                  ) : (
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => {
-                        setActiveRevision(contract.id, entry.id);
-                        toast.success("ABI revision activated.");
-                      }}
-                    >
-                      Activate
-                    </Button>
+
+                  <div className="revision-meta mono">
+                    <span>{plural(entry.counts.functions, "function")}</span>
+                    <span>{plural(entry.counts.events, "event")}</span>
+                    <span>{plural(entry.counts.errors, "error")}</span>
+                  </div>
+
+                  {(added.length > 0 || removed.length > 0) && (
+                    <div className="revision-diff">
+                      {added.length > 0 && (
+                        <div>
+                          <span className="diff-label added">+ added vs active</span>
+                          <div className="diff-chips">
+                            {added.slice(0, 6).map((signature) => (
+                              <code key={signature} className="mono">
+                                {signature}
+                              </code>
+                            ))}
+                            {added.length > 6 && (
+                              <span className="hint">+{added.length - 6} more</span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      {removed.length > 0 && (
+                        <div>
+                          <span className="diff-label removed">− removed vs active</span>
+                          <div className="diff-chips">
+                            {removed.slice(0, 6).map((signature) => (
+                              <code key={signature} className="mono">
+                                {signature}
+                              </code>
+                            ))}
+                            {removed.length > 6 && (
+                              <span className="hint">+{removed.length - 6} more</span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   )}
-                </div>
 
-                <div className="revision-meta mono">
-                  <span>{plural(entry.counts.functions, "function")}</span>
-                  <span>{plural(entry.counts.events, "event")}</span>
-                  <span>{plural(entry.counts.errors, "error")}</span>
-                </div>
-
-                {(added.length > 0 || removed.length > 0) && (
-                  <div className="revision-diff">
-                    {added.length > 0 && (
-                      <div>
-                        <span className="diff-label added">+ added vs active</span>
-                        <div className="diff-chips">
-                          {added.slice(0, 6).map((signature) => (
-                            <code key={signature} className="mono">
-                              {signature}
-                            </code>
-                          ))}
-                          {added.length > 6 && (
-                            <span className="hint">+{added.length - 6} more</span>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                    {removed.length > 0 && (
-                      <div>
-                        <span className="diff-label removed">− removed vs active</span>
-                        <div className="diff-chips">
-                          {removed.slice(0, 6).map((signature) => (
-                            <code key={signature} className="mono">
-                              {signature}
-                            </code>
-                          ))}
-                          {removed.length > 6 && (
-                            <span className="hint">+{removed.length - 6} more</span>
-                          )}
-                        </div>
-                      </div>
-                    )}
+                  <div className="revision-foot">
+                    <span className="hash-label">ABI hash</span>
+                    <code className="mono" title={entry.hash}>
+                      {entry.hash}
+                    </code>
+                    <CopyButton value={entry.hash} label="Copy ABI hash" compact />
                   </div>
-                )}
-
-                <div className="revision-foot">
-                  <code className="mono" title={entry.hash}>
-                    {entry.hash}
-                  </code>
-                  <CopyButton value={entry.hash} label="Copy hash" compact />
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      </section>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

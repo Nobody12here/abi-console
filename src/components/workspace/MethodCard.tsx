@@ -10,7 +10,6 @@ import {
   Copy,
   FlaskConical,
   Info,
-  KeyRound,
   Loader2,
   Play,
   RefreshCw,
@@ -582,7 +581,9 @@ export function MethodCard({
               {inputCount} arg{inputCount === 1 ? "" : "s"}
             </span>
           )}
-          <span className="method-selector mono">{selector}</span>
+          <span className="method-selector mono" title={`4-byte selector ${selector}`}>
+            sel {selector}
+          </span>
           <span className="method-output mono">
             → {outputSummary(fn)}
           </span>
@@ -629,7 +630,10 @@ export function MethodCard({
           <div className="method-signature-line">
             <code className="mono">{signature}</code>
             <CopyButton value={signature} label="Copy signature" compact />
-            <span className="selector-chip mono">{selector}</span>
+            <span className="selector-chip mono" title="4-byte function selector">
+              <span className="chip-label">selector</span>
+              {selector}
+            </span>
             <CopyButton value={selector} label="Copy selector" compact />
           </div>
 
@@ -787,7 +791,7 @@ export function MethodCard({
                 <Code2 size={12} /> CALLDATA
               </span>
               <span className="calldata-flags mono">
-                {chainName(contract.chainId)} · {contract.address.slice(0, 6)}…
+                {chainName(contract.chainId)} · to {contract.address.slice(0, 6)}…
                 {contract.address.slice(-4)}
                 {payable && parsedValue.wei > 0n
                   ? ` · ${formatNativeValue(parsedValue.wei, nativeSymbol)}`
@@ -920,13 +924,6 @@ export function MethodCard({
                   </Button>
                 )}
               </div>
-
-              {!isConnected && (
-                <p className="hint">
-                  <KeyRound size={13} /> Connect a wallet on{" "}
-                  {chainName(contract.chainId)} to simulate.
-                </p>
-              )}
 
               {sim.status === "running" && (
                 <p className="hint">

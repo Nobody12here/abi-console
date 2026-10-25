@@ -1,28 +1,19 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  ArrowLeft,
   Check,
-  Download,
   ExternalLink,
   Hash,
   Pencil,
-  ShieldCheck,
   X,
 } from "lucide-react";
 import type { AbiRevision, ContractBinding } from "@/features/abi/types";
-import { sourceKindLabel, sourceLabel } from "@/features/abi/source";
 import { ChainBadge } from "@/components/ui/ChainBadge";
 import { CopyButton } from "@/components/ui/CopyButton";
 import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
 import { useWorkspace } from "@/features/workspace/WorkspaceProvider";
-import {
-  downloadText,
-  plural,
-  shortHash,
-  shortenAddress,
-  toJson,
-} from "@/lib/format";
+import { shortHash } from "@/lib/format";
 import { explorerAddressUrl } from "@/lib/chains";
 
 export function ContractHeader({
@@ -47,11 +38,9 @@ export function ContractHeader({
   return (
     <header className="contract-header">
       <div className="contract-breadcrumb">
-        <Link to="/">Contracts</Link>
-        <span>/</span>
-        <span>{binding.chainId}</span>
-        <span>/</span>
-        <span className="mono">{shortenAddress(binding.address, 5)}</span>
+        <Link to="/">
+          <ArrowLeft size={12} /> All contracts
+        </Link>
       </div>
 
       <div className="contract-title-row">
@@ -126,8 +115,8 @@ export function ContractHeader({
         </div>
 
         <div className="contract-title-actions">
-          <Badge tone="teal" mono title={revision.hash}>
-            <Hash size={11} /> {shortHash(revision.hash, 5)}
+          <Badge tone="teal" mono title={`ABI hash ${revision.hash}`}>
+            <Hash size={11} /> ABI {shortHash(revision.hash, 5)}
           </Badge>
           <CopyButton
             value={window.location.href}
@@ -135,30 +124,7 @@ export function ContractHeader({
             compact
             className="header-action"
           />
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={<Download size={14} />}
-            onClick={() =>
-              downloadText(
-                toJson(revision.raw),
-                `${binding.name.replace(/[^\w.-]+/g, "-")}-abi.json`,
-              )
-            }
-          >
-            ABI
-          </Button>
         </div>
-      </div>
-
-      <div className="contract-provenance">
-        <span>
-          <ShieldCheck size={13} /> ABI source: {sourceLabel(revision.source)}
-        </span>
-        <Badge tone="muted">{sourceKindLabel(revision.source)}</Badge>
-        <span className="mono">{plural(revision.counts.functions, "function")}</span>
-        <span className="mono">{plural(revision.counts.events, "event")}</span>
-        <span className="mono">{plural(revision.counts.errors, "error")}</span>
       </div>
     </header>
   );

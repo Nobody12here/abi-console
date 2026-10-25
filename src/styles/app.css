@@ -643,6 +643,15 @@ hr {
   letter-spacing: 0;
 }
 
+.selector-chip .chip-label {
+  margin-right: 4px;
+  color: var(--faint);
+  font-family: var(--sans);
+  font-size: 8.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .pulse-dot {
   width: 7px;
   height: 7px;
@@ -1550,28 +1559,6 @@ textarea.field.compact {
   background: var(--teal-bg);
 }
 
-.source-index-note {
-  display: flex;
-  align-items: flex-start;
-  gap: 9px;
-  margin-top: 12px;
-  padding: 11px;
-  border-top: 1px solid var(--line);
-  color: var(--faint);
-}
-
-.source-index-note svg {
-  flex: none;
-  margin-top: 1px;
-  color: var(--teal);
-  opacity: 0.8;
-}
-
-.source-index-note p {
-  font-size: 11px;
-  line-height: 1.55;
-}
-
 /* Stats */
 
 .stat-strip {
@@ -2358,22 +2345,6 @@ textarea.field.compact {
   font-size: 10.5px;
 }
 
-.abi-summary-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-top: 11px;
-  color: var(--faint);
-  font-size: 10.5px;
-}
-
-.abi-summary-foot .mono {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .abi-summary.is-empty {
   display: flex;
   flex-direction: column;
@@ -2522,15 +2493,14 @@ textarea.field.compact {
 }
 
 .contract-breadcrumb a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   color: var(--muted);
 }
 
 .contract-breadcrumb a:hover {
   color: var(--teal);
-}
-
-.contract-breadcrumb span:nth-child(even) {
-  opacity: 0.5;
 }
 
 .contract-title-row {
@@ -2589,27 +2559,6 @@ textarea.field.compact {
   gap: 6px;
   flex-wrap: wrap;
   padding-top: 4px;
-}
-
-.contract-provenance {
-  display: flex;
-  align-items: center;
-  gap: 8px 14px;
-  flex-wrap: wrap;
-  margin-top: 14px;
-  color: var(--faint);
-  font-size: 11px;
-}
-
-.contract-provenance > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.contract-provenance svg {
-  color: var(--teal);
-  opacity: 0.8;
 }
 
 .contract-tabs {
@@ -2830,10 +2779,26 @@ textarea.field.compact {
   white-space: nowrap;
 }
 
-.hash-title {
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--text);
+.hash-label {
+  color: var(--faint);
+  font-family: var(--sans);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.hash-block > .hash-label {
+  flex: none;
+  align-self: center;
+}
+
+.hash-block .hash-value {
+  overflow: visible;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  line-height: 1.45;
 }
 
 .kv-list {
@@ -2931,19 +2896,6 @@ textarea.field.compact {
   flex: none;
   margin-top: 1px;
   color: var(--amber);
-}
-
-.revision-strip {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 10px;
-  color: var(--faint);
-  font-size: 11px;
-}
-
-.revision-strip svg {
-  color: var(--violet);
 }
 
 .activity-metrics {
@@ -3094,22 +3046,6 @@ textarea.field.compact {
   height: 3px;
   border-radius: 50%;
   background: var(--faint);
-}
-
-.security-foot {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  flex-wrap: wrap;
-  margin-top: 14px;
-  padding-top: 11px;
-  border-top: 1px solid var(--line);
-  color: var(--faint);
-  font-size: 10.5px;
-}
-
-.security-foot svg {
-  color: var(--teal);
 }
 
 /* --------------------------------------------------------------------------
@@ -4409,10 +4345,6 @@ textarea.field.compact {
   margin-bottom: 12px;
 }
 
-.abi-identity-heading .hash-title {
-  margin-top: 3px;
-}
-
 .abi-meta-strip {
   display: flex;
   align-items: center;
@@ -4588,7 +4520,7 @@ textarea.field.compact {
   min-width: 0;
 }
 
-.revision-hash {
+.revision-source {
   color: var(--text);
   font-size: 12px;
   font-weight: 500;
@@ -5227,10 +5159,11 @@ textarea.field.compact {
     display: none;
   }
 
-.contract-row-main {
-  grid-template-columns: 30px minmax(0, 1.4fr) 100px 120px 80px 20px;
-}
+  .contract-row-main {
+    grid-template-columns: 30px minmax(0, 1.4fr) 100px 120px 20px;
+  }
 
+  .contract-row-hash,
   .contract-row-source,
   .contract-row-time {
     display: none;

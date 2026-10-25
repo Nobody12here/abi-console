@@ -44,7 +44,10 @@ export function ContractRow({
             <span className="muted">No ABI</span>
           )}
         </span>
-        <span className="contract-row-hash mono" title={revision?.hash}>
+        <span
+          className="contract-row-hash mono"
+          title={revision ? `ABI hash ${revision.hash}` : "No ABI loaded"}
+        >
           {revision ? shortHash(revision.hash, 4) : "—"}
         </span>
         <span className="contract-row-source">
