@@ -1,49 +1,52 @@
 /* ==========================================================================
    ABI Console — visual system
-   Dark-first developer tooling. Restrained signal colour on ink surfaces.
+   Dark-first developer tooling. IBM Plex typography and forest-green accents.
    ========================================================================== */
 
 :root {
-  --sans: "Geist Variable", "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+  color-scheme: dark;
 
-  --bg: #070a0f;
-  --glow-1: rgba(94, 234, 212, 0.07);
-  --glow-2: rgba(122, 167, 255, 0.06);
-  --surface: #0b1017;
-  --surface-2: #0f1621;
-  --surface-3: #141d2a;
-  --surface-hover: #172231;
-  --input-bg: #080d14;
-  --line: #1b2634;
-  --line-strong: #2b3a4c;
-  --text: #e5ecf5;
-  --text-2: #b3c0d0;
-  --muted: #8593a6;
-  --faint: #71809a;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
 
-  --teal: #5eead4;
-  --teal-2: #2dd4bf;
-  --teal-contrast: #04130f;
-  --blue: #7aa7ff;
-  --amber: #f0b45f;
-  --coral: #ff8172;
-  --coral-contrast: #1c0705;
-  --green: #67d99b;
-  --violet: #b49bff;
+  --bg: #0E0E0C;
+  --glow-1: rgba(8, 70, 58, 0.20);
+  --glow-2: rgba(122, 167, 255, 0.045);
+  --surface: #121411;
+  --surface-2: #171A16;
+  --surface-3: #1C211C;
+  --surface-hover: #222922;
+  --input-bg: #10120F;
+  --line: #272D27;
+  --line-strong: #39443A;
+  --text: #EDE8DD;
+  --text-2: #C3C1B6;
+  --muted: #9A9B8F;
+  --faint: #858A7F;
 
-  --teal-bg: rgba(94, 234, 212, 0.1);
+  /* Brand green is kept distinct from semantic success green. */
+  --teal: #4CA88F;
+  --teal-2: #66BDA5;
+  --teal-contrast: #07130F;
+  --blue: #8AAFFF;
+  --amber: #E9B86D;
+  --coral: #F08476;
+  --coral-contrast: #1C0705;
+  --green: #72D5A0;
+  --violet: #B8A1FF;
+
+  --teal-bg: rgba(8, 70, 58, 0.24);
   --blue-bg: rgba(122, 167, 255, 0.11);
-  --amber-bg: rgba(240, 180, 95, 0.11);
-  --coral-bg: rgba(255, 129, 114, 0.11);
-  --green-bg: rgba(103, 217, 155, 0.11);
-  --violet-bg: rgba(180, 155, 255, 0.11);
+  --amber-bg: rgba(233, 184, 109, 0.11);
+  --coral-bg: rgba(240, 132, 118, 0.11);
+  --green-bg: rgba(114, 213, 160, 0.11);
+  --violet-bg: rgba(184, 161, 255, 0.11);
 
-  --shadow-lg: 0 28px 80px rgba(0, 0, 0, 0.55);
-  --shadow-md: 0 12px 36px rgba(0, 0, 0, 0.35);
-  --ring: rgba(94, 234, 212, 0.35);
-  --selection: rgba(94, 234, 212, 0.22);
-  --row-stripe: rgba(255, 255, 255, 0.018);
+  --shadow-lg: 0 28px 80px rgba(0, 0, 0, 0.45);
+  --shadow-md: 0 12px 36px rgba(0, 0, 0, 0.28);
+  --ring: rgba(76, 168, 143, 0.48);
+  --selection: rgba(8, 70, 58, 0.42);
+  --row-stripe: rgba(237, 232, 221, 0.018);
 
   --radius: 10px;
   --radius-sm: 7px;
@@ -53,43 +56,45 @@
 }
 
 :root[data-theme="light"] {
-  --bg: #f1f4f8;
-  --glow-1: rgba(13, 148, 136, 0.07);
-  --glow-2: rgba(37, 99, 235, 0.06);
-  --surface: #ffffff;
-  --surface-2: #f7f9fc;
-  --surface-3: #edf2f7;
-  --surface-hover: #e9eff6;
-  --input-bg: #ffffff;
-  --line: #dbe3ec;
-  --line-strong: #c2cfdd;
-  --text: #0c1520;
-  --text-2: #34465a;
-  --muted: #5d6e82;
-  --faint: #5b6b80;
+  color-scheme: light;
 
-  --teal: #0b6b63;
-  --teal-2: #0b7c73;
-  --teal-contrast: #ffffff;
-  --blue: #2563eb;
-  --amber: #a34a08;
-  --coral: #b02a1c;
-  --coral-contrast: #ffffff;
-  --green: #12743a;
-  --violet: #7c3aed;
+  --bg: #F2F4F1;
+  --glow-1: rgba(8, 70, 58, 0.055);
+  --glow-2: rgba(37, 99, 235, 0.035);
+  --surface: #FFFFFF;
+  --surface-2: #F7F9F6;
+  --surface-3: #EDF1EC;
+  --surface-hover: #E7EDE7;
+  --input-bg: #FFFFFF;
+  --line: #D9E0D8;
+  --line-strong: #BCC9BD;
+  --text: #172019;
+  --text-2: #3E4B40;
+  --muted: #5F6D61;
+  --faint: #6B786D;
 
-  --teal-bg: rgba(13, 148, 136, 0.09);
-  --blue-bg: rgba(37, 99, 235, 0.08);
-  --amber-bg: rgba(163, 74, 8, 0.08);
-  --coral-bg: rgba(201, 58, 42, 0.08);
-  --green-bg: rgba(18, 116, 58, 0.08);
-  --violet-bg: rgba(124, 58, 237, 0.08);
+  --teal: #08463A;
+  --teal-2: #0B5A49;
+  --teal-contrast: #FFFFFF;
+  --blue: #285FC4;
+  --amber: #96520B;
+  --coral: #B33226;
+  --coral-contrast: #FFFFFF;
+  --green: #167343;
+  --violet: #7043BD;
 
-  --shadow-lg: 0 28px 70px rgba(15, 34, 56, 0.16);
-  --shadow-md: 0 10px 30px rgba(15, 34, 56, 0.1);
-  --ring: rgba(13, 148, 136, 0.35);
-  --selection: rgba(13, 148, 136, 0.16);
-  --row-stripe: rgba(12, 21, 32, 0.018);
+  --teal-bg: rgba(8, 70, 58, 0.09);
+  --blue-bg: rgba(40, 95, 196, 0.08);
+  --amber-bg: rgba(150, 82, 11, 0.08);
+  --coral-bg: rgba(179, 50, 38, 0.08);
+  --green-bg: rgba(22, 115, 67, 0.08);
+  --violet-bg: rgba(112, 67, 189, 0.08);
+
+  --shadow-lg: 0 28px 70px rgba(23, 32, 25, 0.13);
+  --shadow-md: 0 10px 30px rgba(23, 32, 25, 0.08);
+  --ring: rgba(8, 70, 58, 0.35);
+  --selection: rgba(8, 70, 58, 0.15);
+  --row-stripe: rgba(23, 32, 25, 0.025);
 }
 
 /* --------------------------------------------------------------------------
@@ -1641,13 +1646,29 @@ textarea.field.compact {
   overflow: hidden;
 }
 
-.contract-table-head,
-.contract-row-main {
+
+.contract-table-head {
   display: grid;
   grid-template-columns: minmax(210px, 1.6fr) 106px 132px 96px 90px 84px 24px;
   gap: 12px;
   align-items: center;
 }
+
+.contract-row-main {
+  display: grid;
+  grid-template-columns:
+    30px
+    minmax(0, 1.6fr)
+    106px
+    132px
+    96px
+    90px
+    84px
+    24px;
+  gap: 12px;
+  align-items: center;
+}
+
 
 .contract-table-head {
   padding: 9px 14px;
@@ -5206,9 +5227,9 @@ textarea.field.compact {
     display: none;
   }
 
-  .contract-row-main {
-    grid-template-columns: minmax(180px, 1.4fr) 100px 120px 80px 20px;
-  }
+.contract-row-main {
+  grid-template-columns: 30px minmax(0, 1.4fr) 100px 120px 80px 20px;
+}
 
   .contract-row-source,
   .contract-row-time {
