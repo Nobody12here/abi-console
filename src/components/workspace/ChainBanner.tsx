@@ -1,8 +1,7 @@
-import { ArrowLeftRight, ShieldAlert } from "lucide-react";
+import { TriangleAlert } from "lucide-react";
 import { useAccount, useSwitchChain } from "wagmi";
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui/Button";
-import { ChainBadge } from "@/components/ui/ChainBadge";
 import { chainName } from "@/lib/chains";
 import { errorMessage } from "@/features/execution/errors";
 
@@ -15,25 +14,16 @@ export function ChainBanner({ contractChainId }: { contractChainId: number }) {
   }
 
   return (
-    <div className="chain-banner" role="status">
-      <span className="chain-banner-icon">
-        <ShieldAlert size={16} />
-      </span>
+    <div className="notice warning" role="status">
+      <TriangleAlert size={16} />
       <div>
-        <strong>Wallet is on the wrong network</strong>
-        <p>
-          This contract lives on {chainName(contractChainId)}. Your wallet is on{" "}
-          {chainName(chainId)}. Writes are disabled until the networks match.
-        </p>
-      </div>
-      <div className="chain-banner-target">
-        <ChainBadge chainId={contractChainId} />
+        Your wallet is on <strong>{chainName(chainId)}</strong>, but this
+        contract is on <strong>{chainName(contractChainId)}</strong>. Switch
+        networks to send transactions.
       </div>
       <Button
-        variant="primary"
         size="sm"
         loading={isPending}
-        icon={<ArrowLeftRight size={14} />}
         onClick={async () => {
           try {
             await switchChainAsync({ chainId: contractChainId });
@@ -42,7 +32,7 @@ export function ChainBanner({ contractChainId }: { contractChainId: number }) {
           }
         }}
       >
-        Switch wallet
+        Switch to {chainName(contractChainId)}
       </Button>
     </div>
   );

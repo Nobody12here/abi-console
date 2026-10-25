@@ -166,7 +166,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     document.documentElement.dataset.theme = resolvedTheme;
     document.documentElement.style.colorScheme = resolvedTheme;
     const meta = document.querySelector('meta[name="theme-color"]');
-    meta?.setAttribute("content", resolvedTheme === "dark" ? "#080b11" : "#f2f4f8");
+    meta?.setAttribute("content", resolvedTheme === "dark" ? "#141517" : "#ffffff");
     saveTheme(state.settings.theme);
   }, [resolvedTheme, state.settings.theme]);
 
@@ -332,11 +332,17 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const removeBinding = useCallback(
     (id: string) => {
-      apply((current) => ({
-        ...current,
-        bindings: current.bindings.filter((binding) => binding.id !== id),
-        txs: current.txs.filter((tx) => tx.contractId !== id),
-      }));
+      apply((current) => {
+        const bindings = current.bindings.filter((binding) => binding.id !== id);
+        // Revisions are shared by hash, so keep any another contract still uses.
+        const inUse = new Set(bindings.flatMap((binding) => binding.revisionIds));
+        return {
+          ...current,
+          bindings,
+          revisions: current.revisions.filter((revision) => inUse.has(revision.id)),
+          txs: current.txs.filter((tx) => tx.contractId !== id),
+        };
+      });
     },
     [apply],
   );

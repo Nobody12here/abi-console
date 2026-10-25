@@ -32,7 +32,7 @@ export function defaultSettings(): Settings {
   const theme: ThemeMode =
     storedTheme === "light" || storedTheme === "dark" || storedTheme === "system"
       ? storedTheme
-      : "dark";
+      : "system";
 
   return {
     theme,
@@ -245,6 +245,10 @@ export async function clearWorkspaceStorage(): Promise<void> {
   }
   localStorage.removeItem(FALLBACK_KEY);
   localStorage.removeItem(QUARANTINE_KEY);
+  // Remembered method arguments live under their own per-method keys.
+  for (const key of Object.keys(localStorage)) {
+    if (key.startsWith("abiconsole:args:")) localStorage.removeItem(key);
+  }
 }
 
 export function saveTheme(theme: ThemeMode): void {

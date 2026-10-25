@@ -1,37 +1,37 @@
 import { cn } from "@/lib/utils";
-import { chainShortName } from "@/lib/chains";
+import { chainShortName, getChain } from "@/lib/chains";
 
-const TONE: Record<number, string> = {
-  1: "chain-blue",
-  11155111: "chain-amber",
-  8453: "chain-blue",
-  84532: "chain-amber",
-  42161: "chain-blue",
-  421614: "chain-amber",
-  10: "chain-red",
-  11155420: "chain-amber",
-  137: "chain-violet",
-  80002: "chain-amber",
-  56: "chain-amber",
-  97: "chain-amber",
-  31337: "chain-teal",
+// Dot colour follows the network family; testnets get a hollow dot.
+const FAMILY: Record<number, string> = {
+  1: "eth",
+  11155111: "eth",
+  8453: "base",
+  84532: "base",
+  42161: "arb",
+  421614: "arb",
+  10: "op",
+  11155420: "op",
+  137: "poly",
+  80002: "poly",
+  56: "bnb",
+  97: "bnb",
+  31337: "local",
 };
 
 export function ChainBadge({
   chainId,
   className,
-  showDot = true,
 }: {
   chainId: number;
   className?: string;
-  showDot?: boolean;
 }) {
+  const testnet = Boolean(getChain(chainId)?.testnet);
   return (
     <span
-      className={cn("chain-badge", TONE[chainId] ?? "chain-neutral", className)}
-      title={`Chain ${chainId}`}
+      className={cn("chain-badge", `chain-${FAMILY[chainId] ?? "other"}`, testnet && "is-testnet", className)}
+      title={`Chain ID ${chainId}${testnet ? " (testnet)" : ""}`}
     >
-      {showDot && <span className="chain-dot" aria-hidden="true" />}
+      <span className="chain-dot" aria-hidden="true" />
       {chainShortName(chainId)}
     </span>
   );

@@ -114,8 +114,11 @@ export function downloadText(
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = filename;
+  document.body.appendChild(anchor);
   anchor.click();
-  URL.revokeObjectURL(url);
+  anchor.remove();
+  // Revoking immediately can cancel the download in Firefox and Safari.
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export function makeId(): string {
@@ -131,4 +134,14 @@ export function hexBytes(hex: string): number {
 
 export function isHexData(value: string): value is Hex {
   return /^0x[0-9a-fA-F]*$/.test(value);
+}
+
+/** One-line rendering of a decoded value, for collapsed rows. */
+export function previewValue(value: unknown): string {
+  if (value === null || value === undefined) return "—";
+  if (typeof value === "string") return value === "" ? '""' : value;
+  if (typeof value === "bigint" || typeof value === "boolean" || typeof value === "number") {
+    return String(value);
+  }
+  return toJson(value, 0);
 }

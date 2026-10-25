@@ -8,11 +8,10 @@ import { BrowserRouter } from "react-router-dom";
 import { config } from "./wagmiConfig";
 import { WorkspaceProvider, useWorkspace } from "@/features/workspace/WorkspaceProvider";
 import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
+import { THEME_KEY } from "@/features/storage/workspace";
 import App from "./App";
 
-import "@fontsource-variable/geist";
 import "@fontsource-variable/jetbrains-mono";
-import "./index.css";
 import "./styles/app.css";
 
 const queryClient = new QueryClient({
@@ -25,30 +24,43 @@ const queryClient = new QueryClient({
   },
 });
 
-const initialTheme =
-  localStorage.getItem("abiconsole:theme") === "light" ? "light" : "dark";
-document.documentElement.dataset.theme = initialTheme;
-document.documentElement.style.colorScheme = initialTheme;
+// Resolve the theme before the first paint so "system" does not flash dark.
+function initialTheme(): "dark" | "light" {
+  let stored: string | null = null;
+  try {
+    stored = localStorage.getItem(THEME_KEY);
+  } catch {
+    // Storage can be unavailable; fall back to the OS preference.
+  }
+  if (stored === "dark" || stored === "light") return stored;
+  return window.matchMedia?.("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
+}
+
+const theme = initialTheme();
+document.documentElement.dataset.theme = theme;
+document.documentElement.style.colorScheme = theme;
 
 function RainbowBridge() {
   const { resolvedTheme } = useWorkspace();
-  const theme =
+  const walletTheme =
     resolvedTheme === "dark"
       ? darkTheme({
-          accentColor: "#7de3d4",
-          accentColorForeground: "#07120f",
-          borderRadius: "medium",
+          accentColor: "#3b74e0",
+          accentColorForeground: "#ffffff",
+          borderRadius: "small",
           fontStack: "system",
         })
       : lightTheme({
-          accentColor: "#0f766e",
+          accentColor: "#2563eb",
           accentColorForeground: "#ffffff",
-          borderRadius: "medium",
+          borderRadius: "small",
           fontStack: "system",
         });
 
   return (
-    <RainbowKitProvider theme={theme} modalSize="compact">
+    <RainbowKitProvider theme={walletTheme} modalSize="compact">
       <BrowserRouter>
         <App />
       </BrowserRouter>

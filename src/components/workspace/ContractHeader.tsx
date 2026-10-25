@@ -1,164 +1,99 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import {
-  Check,
-  Download,
-  ExternalLink,
-  Hash,
-  Pencil,
-  ShieldCheck,
-  X,
-} from "lucide-react";
-import type { AbiRevision, ContractBinding } from "@/features/abi/types";
-import { sourceKindLabel, sourceLabel } from "@/features/abi/source";
+import { ArrowLeft, Check, ExternalLink, Pencil, X } from "lucide-react";
+import type { ContractBinding } from "@/features/abi/types";
 import { ChainBadge } from "@/components/ui/ChainBadge";
 import { CopyButton } from "@/components/ui/CopyButton";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
 import { useWorkspace } from "@/features/workspace/WorkspaceProvider";
-import {
-  downloadText,
-  plural,
-  shortHash,
-  shortenAddress,
-  toJson,
-} from "@/lib/format";
 import { explorerAddressUrl } from "@/lib/chains";
+import { explorerName } from "@/lib/explorer";
 
-export function ContractHeader({
-  binding,
-  revision,
-}: {
-  binding: ContractBinding;
-  revision: AbiRevision;
-}) {
+export function ContractHeader({ binding }: { binding: ContractBinding }) {
   const { updateBinding } = useWorkspace();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(binding.name);
   const explorer = explorerAddressUrl(binding.chainId, binding.address);
 
+  const cancel = () => {
+    setEditing(false);
+    setName(binding.name);
+  };
+
   const saveName = () => {
     const next = name.trim();
-    if (!next) return;
+    if (!next) return cancel();
     updateBinding(binding.id, { name: next });
     setEditing(false);
   };
 
   return (
     <header className="contract-header">
-      <div className="contract-breadcrumb">
-        <Link to="/">Contracts</Link>
-        <span>/</span>
-        <span>{binding.chainId}</span>
-        <span>/</span>
-        <span className="mono">{shortenAddress(binding.address, 5)}</span>
-      </div>
+      <Link to="/" className="back-link">
+        <ArrowLeft size={14} /> Contracts
+      </Link>
 
-      <div className="contract-title-row">
-        <div className="contract-title-copy">
-          {editing ? (
-            <div className="rename-row">
-              <input
-                className="field"
-                value={name}
-                autoFocus
-                onChange={(event) => setName(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") saveName();
-                  if (event.key === "Escape") {
-                    setEditing(false);
-                    setName(binding.name);
-                  }
-                }}
-              />
-              <button
-                type="button"
-                className="icon-btn"
-                aria-label="Save name"
-                onClick={saveName}
-              >
-                <Check size={15} />
-              </button>
-              <button
-                type="button"
-                className="icon-btn"
-                aria-label="Cancel rename"
-                onClick={() => {
-                  setEditing(false);
-                  setName(binding.name);
-                }}
-              >
-                <X size={15} />
-              </button>
-            </div>
-          ) : (
-            <div className="contract-name-row">
-              <h1>{binding.name}</h1>
-              <button
-                type="button"
-                className="icon-btn small"
-                aria-label="Rename contract"
-                title="Rename contract"
-                onClick={() => setEditing(true)}
-              >
-                <Pencil size={13} />
-              </button>
-            </div>
-          )}
-
-          <div className="contract-subline">
-            <ChainBadge chainId={binding.chainId} />
-            <span className="mono address-text">{binding.address}</span>
-            <CopyButton value={binding.address} label="Copy address" compact />
-            {explorer && (
-              <a
-                className="icon-link"
-                href={explorer}
-                target="_blank"
-                rel="noreferrer"
-                aria-label="Open contract in explorer"
-                title="Open in explorer"
-              >
-                <ExternalLink size={13} />
-              </a>
-            )}
-          </div>
-        </div>
-
-        <div className="contract-title-actions">
-          <Badge tone="teal" mono title={revision.hash}>
-            <Hash size={11} /> {shortHash(revision.hash, 5)}
-          </Badge>
-          <CopyButton
-            value={window.location.href}
-            label="Copy link"
-            compact
-            className="header-action"
+      {editing ? (
+        <div className="rename-row">
+          <input
+            className="field"
+            value={name}
+            autoFocus
+            aria-label="Contract name"
+            onChange={(event) => setName(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") saveName();
+              if (event.key === "Escape") cancel();
+            }}
           />
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={<Download size={14} />}
-            onClick={() =>
-              downloadText(
-                toJson(revision.raw),
-                `${binding.name.replace(/[^\w.-]+/g, "-")}-abi.json`,
-              )
-            }
+          <button
+            type="button"
+            className="icon-btn"
+            aria-label="Save name"
+            onClick={saveName}
           >
-            ABI
-          </Button>
+            <Check size={15} />
+          </button>
+          <button
+            type="button"
+            className="icon-btn"
+            aria-label="Cancel rename"
+            onClick={cancel}
+          >
+            <X size={15} />
+          </button>
         </div>
-      </div>
+      ) : (
+        <div className="contract-name-row">
+          <h1>{binding.name}</h1>
+          <button
+            type="button"
+            className="icon-btn small"
+            aria-label="Rename contract"
+            title="Rename"
+            onClick={() => {
+              setName(binding.name);
+              setEditing(true);
+            }}
+          >
+            <Pencil size={13} />
+          </button>
+        </div>
+      )}
 
-      <div className="contract-provenance">
-        <span>
-          <ShieldCheck size={13} /> ABI source: {sourceLabel(revision.source)}
-        </span>
-        <Badge tone="muted">{sourceKindLabel(revision.source)}</Badge>
-        <span className="mono">{plural(revision.counts.functions, "function")}</span>
-        <span className="mono">{plural(revision.counts.events, "event")}</span>
-        <span className="mono">{plural(revision.counts.errors, "error")}</span>
+      <div className="contract-subline">
+        <ChainBadge chainId={binding.chainId} />
+        <span className="mono address-text">{binding.address}</span>
+        <CopyButton value={binding.address} label="Copy address" compact />
+        {explorer && (
+          <a
+            className="text-link"
+            href={explorer}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {explorerName(binding.chainId)} <ExternalLink size={12} />
+          </a>
+        )}
       </div>
     </header>
   );

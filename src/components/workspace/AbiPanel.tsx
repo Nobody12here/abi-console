@@ -1,16 +1,5 @@
 import { useMemo, useState } from "react";
-import {
-  AlertTriangle,
-  Braces,
-  Check,
-  ChevronRight,
-  Download,
-  FilePenLine,
-  Hash,
-  History,
-  Layers,
-  Search,
-} from "lucide-react";
+import { ChevronRight, Download, Pencil, Search } from "lucide-react";
 import toast from "react-hot-toast";
 import type { Abi } from "viem";
 import type { AbiRevision, ContractBinding } from "@/features/abi/types";
@@ -22,7 +11,7 @@ import {
   itemLabel,
   itemSignature,
 } from "@/features/abi/utils";
-import { sourceKindLabel, sourceLabel } from "@/features/abi/source";
+import { sourceLabel } from "@/features/abi/source";
 import { useWorkspace } from "@/features/workspace/WorkspaceProvider";
 import { errorMessage } from "@/features/execution/errors";
 import {
@@ -33,7 +22,6 @@ import {
   toJson,
 } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { CopyButton } from "@/components/ui/CopyButton";
 
@@ -72,15 +60,13 @@ export function AbiPanel({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(() => toJson(revision.raw));
   const [issues, setIssues] = useState<string[]>([]);
-  const [saving, setSaving] = useState(false);
 
   const groups = useMemo<Group[]>(() => {
     const needle = filter.trim().toLowerCase();
     const matching = revision.abi.filter((item) => {
       if (!needle) return true;
-      const signature = itemSignature(item).toLowerCase();
       return (
-        signature.includes(needle) ||
+        itemSignature(item).toLowerCase().includes(needle) ||
         item.type.includes(needle) ||
         itemLabel(item).toLowerCase().includes(needle)
       );
@@ -113,11 +99,10 @@ export function AbiPanel({
     try {
       parsed = JSON.parse(draft);
     } catch {
-      setIssues(["That is not valid JSON. Check for missing braces or commas."]);
+      setIssues(["That is not valid JSON."]);
       return;
     }
 
-    setSaving(true);
     try {
       const imported = normalizeAbi(parsed);
       const created = createRevision(imported, { kind: "paste" });
@@ -125,158 +110,104 @@ export function AbiPanel({
       setEditing(false);
       toast.success(
         created.id === revision.id
-          ? "That ABI is already the active revision."
-          : "New ABI revision saved and activated.",
+          ? "No changes to save."
+          : "Saved as a new ABI version.",
       );
     } catch (error) {
-      if (error instanceof AbiValidationError) {
-        setIssues(error.issues);
-      } else {
-        setIssues([errorMessage(error)]);
-      }
-    } finally {
-      setSaving(false);
+      setIssues(
+        error instanceof AbiValidationError ? error.issues : [errorMessage(error)],
+      );
     }
   };
 
   return (
     <div className="abi-panel">
-      <section className="abi-identity">
-        <div className="abi-identity-heading">
+      <div className="toolbar">
+        <span className="muted toolbar-count">
+          {sourceLabel(revision.source)} · added {absoluteTime(revision.createdAt)}
+        </span>
+        <Button
+          size="sm"
+          variant="ghost"
+          icon={<Download size={13} />}
+          onClick={() =>
+            downloadText(
+              toJson(revision.raw),
+              `${contract.name.replace(/[^\w.-]+/g, "-")}-abi.json`,
+            )
+          }
+        >
+          Download JSON
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          icon={<Pencil size={13} />}
+          onClick={() => {
+            if (!editing) setDraft(toJson(revision.raw));
+            setIssues([]);
+            setEditing((value) => !value);
+          }}
+        >
+          {editing ? "Close editor" : "Edit JSON"}
+        </Button>
+      </div>
+
+      {revision.warnings.length > 0 && (
+        <div className="notice info">
           <div>
-            <p className="eyebrow">ACTIVE ABI · REVISION</p>
-            <h2 className="mono hash-title">{shortHash(revision.hash, 12)}</h2>
+            <strong>Import notes</strong>
+            <ul className="plain-list">
+              {revision.warnings.map((warning) => (
+                <li key={warning}>{warning}</li>
+              ))}
+            </ul>
           </div>
-          <Badge tone="teal">
-            <Layers size={11} /> {orderedRevisions.length} revision
-            {orderedRevisions.length === 1 ? "" : "s"}
-          </Badge>
         </div>
-
-        <div className="hash-block">
-          <Hash size={13} />
-          <span className="mono">{revision.hash}</span>
-          <CopyButton value={revision.hash} label="Copy ABI hash" compact />
-        </div>
-
-        <div className="abi-meta-strip">
-          <span>
-            Source <strong>{sourceLabel(revision.source)}</strong>
-          </span>
-          <Badge tone="muted">{sourceKindLabel(revision.source)}</Badge>
-          <span>{absoluteTime(revision.createdAt)}</span>
-          <span className="mono">
-            {revision.counts.functions} fn · {revision.counts.events} ev ·{" "}
-            {revision.counts.errors} err
-          </span>
-        </div>
-
-        {revision.warnings.length > 0 && (
-          <div className="warning-list">
-            <p className="eyebrow">IMPORT NOTES</p>
-            {revision.warnings.map((warning) => (
-              <p key={warning}>{warning}</p>
-            ))}
-          </div>
-        )}
-
-        <div className="abi-identity-actions">
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={<Download size={13} />}
-            onClick={() =>
-              downloadText(
-                toJson(revision.raw),
-                `${contract.name.replace(/[^\w.-]+/g, "-")}-abi-${shortHash(revision.hash, 4)}.json`,
-              )
-            }
-          >
-            Download raw ABI
-          </Button>
-          <Button
-            variant={editing ? "ghost" : "secondary"}
-            size="sm"
-            icon={<FilePenLine size={13} />}
-            onClick={() => setEditing((value) => !value)}
-          >
-            {editing ? "Close editor" : "Edit raw ABI"}
-          </Button>
-        </div>
-      </section>
+      )}
 
       {editing && (
-        <section className="abi-editor">
-          <div className="panel-heading">
-            <div>
-              <p className="eyebrow">RAW ABI EDITOR</p>
-              <h2>Create a new revision</h2>
-            </div>
-            <Badge tone="amber">Immutable history</Badge>
-          </div>
+        <section className="section">
           <p className="hint">
-            Editing this JSON validates a new ABI, computes a new hash, stores it
-            as a new revision, and activates it for this contract. The current
-            revision stays available below.
+            Saving creates a new ABI version and switches to it. The current
+            version stays in the list below, so you can switch back.
           </p>
           <textarea
-            className={cn("field mono textarea", issues.length > 0 && "invalid")}
+            className={cn("field mono textarea tall", issues.length > 0 && "invalid")}
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             spellCheck={false}
-            aria-label="Raw ABI JSON"
+            aria-label="ABI JSON"
           />
           {issues.length > 0 && (
-            <div className="issue-box" role="alert">
-              <span className="issue-icon">
-                <AlertTriangle size={16} />
-              </span>
-              <div>
-                <strong>
-                  {issues.length === 1 ? "1 validation issue" : `${issues.length} validation issues`}
-                </strong>
-                <ul>
-                  {issues.slice(0, 6).map((issue) => (
-                    <li key={issue}>{issue}</li>
-                  ))}
-                </ul>
-              </div>
+            <div className="status-line danger" role="alert">
+              <ul className="plain-list">
+                {issues.slice(0, 6).map((issue) => (
+                  <li key={issue}>{issue}</li>
+                ))}
+              </ul>
             </div>
           )}
-          <div className="abi-editor-actions">
-            <Button
-              variant="primary"
-              icon={<Check size={14} />}
-              loading={saving}
-              onClick={saveRevision}
-            >
-              Validate &amp; save revision
+          <div className="button-row">
+            <Button variant="primary" onClick={saveRevision}>
+              Save as new version
             </Button>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setDraft(toJson(revision.raw));
-                setIssues([]);
-              }}
-            >
-              Reset to active
+            <Button variant="ghost" onClick={() => setEditing(false)}>
+              Cancel
             </Button>
           </div>
         </section>
       )}
 
-      <section className="abi-tree">
-        <div className="panel-heading">
-          <div>
-            <p className="eyebrow">INTERFACE TREE</p>
-            <h2>Every ABI item</h2>
-          </div>
-          <label className="search-field compact-search">
+      <section className="section">
+        <div className="section-heading">
+          <h2>Items</h2>
+          <label className="search-field compact">
             <Search size={13} />
             <input
               value={filter}
               onChange={(event) => setFilter(event.target.value)}
-              placeholder="Filter items"
+              placeholder="Filter"
               aria-label="Filter ABI items"
               spellCheck={false}
             />
@@ -284,157 +215,98 @@ export function AbiPanel({
         </div>
 
         {groups.length === 0 ? (
-          <p className="empty-inline">
-            <Braces size={14} /> No items match “{filter}”.
-          </p>
+          <p className="muted">No items match “{filter}”.</p>
         ) : (
           groups.map((group) => (
             <div key={group.id} className="abi-group">
-              <div className="abi-group-heading">
-                <span>{group.label}</span>
-                <span className="mono">{group.items.length}</span>
+              <h3 className="abi-group-heading">
+                {group.label} <span className="muted">{group.items.length}</span>
+              </h3>
+              <div className="table">
+                {group.items.map((item, index) => {
+                  const signature = itemSignature(item);
+                  return (
+                    <details
+                      key={`${group.id}:${signature}:${index}`}
+                      className="abi-item"
+                    >
+                      <summary>
+                        <ChevronRight size={13} className="chevron" />
+                        <span className="mono break">{signature}</span>
+                        <CopyButton value={signature} label="Copy signature" compact />
+                      </summary>
+                      <pre className="mono code-block">{toJson(item)}</pre>
+                    </details>
+                  );
+                })}
               </div>
-              {group.items.map((item, index) => {
-                const signature = itemSignature(item);
-                return (
-                  <details
-                    key={`${group.id}:${signature}:${index}`}
-                    className="abi-item"
-                  >
-                    <summary>
-                      <ChevronRight size={13} className="abi-chevron" />
-                      <span className="mono abi-item-signature">
-                        {signature}
-                      </span>
-                      <span className="abi-item-type">{item.type}</span>
-                      <CopyButton
-                        value={signature}
-                        label="Copy signature"
-                        compact
-                      />
-                    </summary>
-                    <pre className="abi-item-json mono">
-                      {toJson(item)}
-                    </pre>
-                  </details>
-                );
-              })}
             </div>
           ))
         )}
       </section>
 
-      <section className="abi-revisions">
-        <div className="panel-heading">
-          <div>
-            <p className="eyebrow">LOCAL HISTORY</p>
-            <h2>ABI revisions</h2>
-          </div>
-          <Badge tone="muted">
-            <History size={11} /> {orderedRevisions.length} stored
-          </Badge>
+      <section className="section">
+        <div className="section-heading">
+          <h2>Versions</h2>
         </div>
         <p className="hint">
-          Revisions are immutable. Activating one changes the interface used for
-          reads, writes, and log decoding without deleting any previous version.
+          Each time you replace or edit the ABI, the old version is kept. Switch
+          versions here.
         </p>
-
-        <div className="revision-list">
+        <div className="table">
           {orderedRevisions.map((entry) => {
             const active = entry.id === revision.id;
             const entrySignatures = new Set(signaturesOf(entry.abi));
             const added = active
               ? []
-              : signaturesOf(entry.abi).filter(
-                  (signature) => !activeSignatures.has(signature),
-                );
+              : signaturesOf(entry.abi).filter((sig) => !activeSignatures.has(sig));
             const removed = active
               ? []
-              : signaturesOf(revision.abi).filter(
-                  (signature) => !entrySignatures.has(signature),
-                );
+              : signaturesOf(revision.abi).filter((sig) => !entrySignatures.has(sig));
 
             return (
-              <article
-                key={entry.id}
-                className={cn("revision-card", active && "is-active")}
-              >
-                <div className="revision-head">
+              <div key={entry.id} className={cn("revision-row", active && "is-active")}>
+                <div className="revision-main">
                   <div>
-                    <span className="mono revision-hash" title={entry.hash}>
-                      {shortHash(entry.hash, 9)}
+                    <strong>{sourceLabel(entry.source)}</strong>
+                    <span className="muted">
+                      {" "}· {absoluteTime(entry.createdAt)} ·{" "}
+                      {plural(entry.counts.functions, "function")}
                     </span>
-                    <span className="hint">
-                      {absoluteTime(entry.createdAt)} ·{" "}
-                      {sourceKindLabel(entry.source)}
-                    </span>
+                    <div className="muted mono revision-hash" title={entry.hash}>
+                      {shortHash(entry.hash, 8)}
+                    </div>
                   </div>
                   {active ? (
-                    <Badge tone="green">
-                      <Check size={11} /> Active
-                    </Badge>
+                    <span className="tag tag-green">In use</span>
                   ) : (
                     <Button
                       size="sm"
-                      variant="secondary"
                       onClick={() => {
                         setActiveRevision(contract.id, entry.id);
-                        toast.success("ABI revision activated.");
+                        toast.success("Switched ABI version.");
                       }}
                     >
-                      Activate
+                      Use this version
                     </Button>
                   )}
                 </div>
 
-                <div className="revision-meta mono">
-                  <span>{plural(entry.counts.functions, "function")}</span>
-                  <span>{plural(entry.counts.events, "event")}</span>
-                  <span>{plural(entry.counts.errors, "error")}</span>
-                </div>
-
                 {(added.length > 0 || removed.length > 0) && (
-                  <div className="revision-diff">
-                    {added.length > 0 && (
-                      <div>
-                        <span className="diff-label added">+ added vs active</span>
-                        <div className="diff-chips">
-                          {added.slice(0, 6).map((signature) => (
-                            <code key={signature} className="mono">
-                              {signature}
-                            </code>
-                          ))}
-                          {added.length > 6 && (
-                            <span className="hint">+{added.length - 6} more</span>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                    {removed.length > 0 && (
-                      <div>
-                        <span className="diff-label removed">− removed vs active</span>
-                        <div className="diff-chips">
-                          {removed.slice(0, 6).map((signature) => (
-                            <code key={signature} className="mono">
-                              {signature}
-                            </code>
-                          ))}
-                          {removed.length > 6 && (
-                            <span className="hint">+{removed.length - 6} more</span>
-                          )}
-                        </div>
-                      </div>
+                  <div className="revision-diff mono">
+                    <div className="muted">Compared with the version in use:</div>
+                    {added.slice(0, 5).map((sig) => (
+                      <div key={`+${sig}`} className="diff-added">+ {sig}</div>
+                    ))}
+                    {removed.slice(0, 5).map((sig) => (
+                      <div key={`-${sig}`} className="diff-removed">− {sig}</div>
+                    ))}
+                    {added.length + removed.length > 10 && (
+                      <div className="muted">…and more</div>
                     )}
                   </div>
                 )}
-
-                <div className="revision-foot">
-                  <code className="mono" title={entry.hash}>
-                    {entry.hash}
-                  </code>
-                  <CopyButton value={entry.hash} label="Copy hash" compact />
-                </div>
-              </article>
+              </div>
             );
           })}
         </div>

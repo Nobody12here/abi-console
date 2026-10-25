@@ -1,96 +1,118 @@
-import { useMemo, useRef, useState } from "react";
+import { useDeferredValue, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { useAccount } from "wagmi";
 import { useQuery } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import {
   AlertTriangle,
-  ArrowLeft,
-  ArrowRight,
-  Braces,
   Check,
-  CircleHelp,
-  FileJson2,
-  FolderInput,
-  Globe2,
-  Hash,
-  KeyRound,
-  Link2,
+  CircleAlert,
   Loader2,
-  ShieldAlert,
-  ShieldCheck,
   Upload,
 } from "lucide-react";
 import { getAddress, isAddress } from "viem";
-import type { AbiSource } from "@/features/abi/types";
+import type { AbiSource, ImportedAbi } from "@/features/abi/types";
 import {
   AbiValidationError,
   normalizeAbi,
 } from "@/features/abi/normalize";
-import type { ImportedAbi } from "@/features/abi/types";
-import { sourceLabel } from "@/features/abi/source";
+import { proxyLabel } from "@/features/abi/utils";
 import { useWorkspace } from "@/features/workspace/WorkspaceProvider";
-import { CHAINS, chainName, DEFAULT_CHAIN_ID, explorerAbiSupported } from "@/lib/chains";
+import {
+  CHAINS,
+  chainName,
+  DEFAULT_CHAIN_ID,
+  explorerAbiSupported,
+  getChain,
+  isLocalChain,
+} from "@/lib/chains";
 import { createReadClient } from "@/lib/rpc";
 import { inspectContract } from "@/lib/proxy";
 import { fetchAbiFromUrl, fetchExplorerAbi } from "@/lib/explorer";
 import { errorMessage } from "@/features/execution/errors";
-import { absoluteTime, shortHash, shortSignature } from "@/lib/format";
+import { plural, shortenAddress } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
-import { ChainBadge } from "@/components/ui/ChainBadge";
 import { PageHeader } from "@/components/layout/Brand";
-import { CopyButton } from "@/components/ui/CopyButton";
+import { PageLoading } from "@/components/ui/PageLoading";
 
-type SourceKind = "file" | "paste" | "url" | "explorer";
+type SourceKind = "paste" | "file" | "url" | "explorer";
 
-const SOURCE_TABS: Array<{
-  id: SourceKind;
-  label: string;
-  icon: typeof FileJson2;
-}> = [
-  { id: "file", label: "File", icon: FolderInput },
-  { id: "paste", label: "Paste", icon: FileJson2 },
-  { id: "url", label: "URL", icon: Link2 },
-  { id: "explorer", label: "Explorer", icon: Globe2 },
+type Loaded = { imported: ImportedAbi; source: AbiSource };
+
+const SOURCE_TABS: Array<{ id: SourceKind; label: string }> = [
+  { id: "paste", label: "Paste JSON" },
+  { id: "file", label: "Upload file" },
+  { id: "url", label: "From URL" },
+  { id: "explorer", label: "Etherscan" },
 ];
 
 function parseSource(value: string | null): SourceKind {
-  return value === "paste" || value === "url" || value === "explorer"
+  return value === "file" || value === "url" || value === "explorer"
     ? value
-    : "file";
+    : "paste";
+}
+
+function validationIssues(error: unknown): string[] {
+  return error instanceof AbiValidationError
+    ? error.issues
+    : [errorMessage(error)];
 }
 
 function IssueList({ issues }: { issues: string[] }) {
+  if (issues.length === 0) return null;
   return (
-    <div className="issue-box" role="alert">
-      <span className="issue-icon">
-        <AlertTriangle size={16} />
-      </span>
+    <div className="status-line danger" role="alert">
+      <AlertTriangle size={14} />
       <div>
-        <strong>{issues.length === 1 ? "Check the ABI" : `${issues.length} ABI issues`}</strong>
-        <ul>
-          {issues.slice(0, 5).map((issue) => (
-            <li key={issue}>{issue}</li>
-          ))}
-        </ul>
-        {issues.length > 5 && (
-          <small>{issues.length - 5} more issues not shown.</small>
+        {issues.length === 1 ? (
+          <span>{issues[0]}</span>
+        ) : (
+          <ul>
+            {issues.slice(0, 5).map((issue) => (
+              <li key={issue}>{issue}</li>
+            ))}
+            {issues.length > 5 && <li>…and {issues.length - 5} more</li>}
+          </ul>
         )}
       </div>
     </div>
   );
 }
 
+function AbiSummary({ imported }: { imported: ImportedAbi }) {
+  const { counts } = imported;
+  return (
+    <div className="status-line success" role="status">
+      <Check size={14} />
+      <span>
+        Valid ABI: {plural(counts.functions, "function")} ({counts.readFunctions}{" "}
+        read, {counts.writeFunctions} write), {plural(counts.events, "event")}
+        {imported.warnings.length > 0 &&
+          ` · ${plural(imported.warnings.length, "note")} (see the ABI tab)`}
+      </span>
+    </div>
+  );
+}
+
+const isTestOrLocal = (chain: (typeof CHAINS)[number]) =>
+  Boolean(chain.testnet) || isLocalChain(chain.id);
+const mainnets = CHAINS.filter((chain) => !isTestOrLocal(chain));
+const testnets = CHAINS.filter(isTestOrLocal);
+
 export function ImportPage() {
+  const { ready } = useWorkspace();
+  // The default network comes from saved settings, so wait until they load.
+  return ready ? <ImportForm /> : <PageLoading />;
+}
+
+function ImportForm() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const { address: walletAddress, chainId: walletChainId } = useAccount();
+  const { chainId: walletChainId } = useAccount();
   const {
     settings,
     bindings,
-    revisionFor,
     createRevision,
     saveContract,
     updateSettings,
@@ -99,59 +121,62 @@ export function ImportPage() {
   const [sourceKind, setSourceKind] = useState<SourceKind>(() =>
     parseSource(params.get("source")),
   );
-  const [openedAt] = useState(() => new Date().toISOString());
-  const [imported, setImported] = useState<ImportedAbi | null>(null);
-  const [abiSource, setAbiSource] = useState<AbiSource | null>(null);
-  const [sourceError, setSourceError] = useState<string[]>([]);
-  const [sourceBusy, setSourceBusy] = useState(false);
+  const [loaded, setLoaded] = useState<Partial<Record<SourceKind, Loaded>>>({});
+  const [issues, setIssues] = useState<Partial<Record<SourceKind, string[]>>>({});
+  const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [paste, setPaste] = useState("");
   const [url, setUrl] = useState("");
   const [fileName, setFileName] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const initialChain =
-    Number(params.get("chainId")) ||
-    (walletChainId && CHAINS.some((chain) => chain.id === walletChainId)
-      ? walletChainId
-      : settings.lastChainId) ||
-    DEFAULT_CHAIN_ID;
-
+  // Only accept a chain from the link if this app supports it.
+  const [chainId, setChainId] = useState(() => {
+    const fromParams = Number(params.get("chainId"));
+    if (getChain(fromParams)) return fromParams;
+    if (getChain(walletChainId)) return walletChainId!;
+    if (getChain(settings.lastChainId)) return settings.lastChainId!;
+    return DEFAULT_CHAIN_ID;
+  });
   const [address, setAddress] = useState(params.get("address") ?? "");
-  const [chainId, setChainId] = useState(initialChain);
   const [name, setName] = useState("");
 
-  const urlPreview = useMemo(() => {
-    const raw = url.trim();
-    if (!raw) return null;
+  const trimmedAddress = address.trim();
+  const addressValid = isAddress(trimmedAddress);
+  const normalizedAddress = addressValid ? getAddress(trimmedAddress) : undefined;
+  const existing = normalizedAddress
+    ? bindings.find(
+        (binding) =>
+          binding.chainId === chainId && binding.address === normalizedAddress,
+      )
+    : undefined;
+
+  // Pasted JSON is validated as you type, so there is no separate "load" step.
+  const deferredPaste = useDeferredValue(paste);
+  const pasteResult = useMemo<
+    { loaded?: Loaded; issues: string[] } | undefined
+  >(() => {
+    if (!deferredPaste.trim()) return undefined;
+    let parsed: unknown;
     try {
-      const parsed = new URL(raw);
-      const isLocal =
-        parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
-      return {
-        invalid: false as const,
-        origin: parsed.origin,
-        path: `${parsed.pathname}${parsed.search}`,
-        secure:
-          parsed.protocol === "https:" ||
-          (parsed.protocol === "http:" && isLocal),
-      };
+      parsed = JSON.parse(deferredPaste);
     } catch {
-      return { invalid: true as const };
+      return { issues: ["This is not valid JSON yet."] };
     }
-  }, [url]);
+    try {
+      return {
+        loaded: { imported: normalizeAbi(parsed), source: { kind: "paste" } },
+        issues: [],
+      };
+    } catch (error) {
+      return { issues: validationIssues(error) };
+    }
+  }, [deferredPaste]);
 
-
-  const addressValid = isAddress(address);
-  const normalizedAddress = addressValid ? getAddress(address) : undefined;
-  const existing = useMemo(() => {
-    if (!normalizedAddress) return undefined;
-    return bindings.find(
-      (binding) =>
-        binding.chainId === chainId && binding.address === normalizedAddress,
-    );
-  }, [bindings, chainId, normalizedAddress]);
-  const existingRevision = revisionFor(existing);
+  const current: Loaded | undefined =
+    sourceKind === "paste" ? pasteResult?.loaded : loaded[sourceKind];
+  const currentIssues =
+    sourceKind === "paste" ? (pasteResult?.issues ?? []) : (issues[sourceKind] ?? []);
 
   const codeQuery = useQuery({
     queryKey: [
@@ -167,330 +192,267 @@ export function ImportPage() {
     },
     retry: 1,
   });
+  const noCode = codeQuery.data?.codeSize === 0;
 
-  const acceptAbi = (
-    value: unknown,
-    source: AbiSource,
-    successMessage = "ABI loaded and validated.",
-  ) => {
+  const setKindIssues = (kind: SourceKind, next: string[]) =>
+    setIssues((value) => ({ ...value, [kind]: next }));
+
+  const accept = (kind: SourceKind, value: unknown, source: AbiSource) => {
     try {
-      const result = normalizeAbi(value);
-      setImported(result);
-      setAbiSource(source);
-      setSourceError([]);
-      toast.success(successMessage);
+      const imported = normalizeAbi(value);
+      setLoaded((entries) => ({ ...entries, [kind]: { imported, source } }));
+      setKindIssues(kind, []);
     } catch (error) {
-      if (error instanceof AbiValidationError) {
-        setSourceError(error.issues);
-      } else {
-        setSourceError([errorMessage(error)]);
-      }
-      toast.error("That ABI could not be loaded. Existing input was kept.");
+      setLoaded((entries) => ({ ...entries, [kind]: undefined }));
+      setKindIssues(kind, validationIssues(error));
     }
   };
 
   const readFile = async (file: File) => {
     if (file.size > 5_000_000) {
-      setSourceError(["That file is larger than 5 MB."]);
+      setKindIssues("file", ["That file is larger than 5 MB."]);
       return;
     }
-    setSourceBusy(true);
+    setBusy(true);
+    setFileName(file.name);
     try {
-      const text = await file.text();
-      const parsed = JSON.parse(text) as unknown;
-      setFileName(file.name);
-      acceptAbi(
-        parsed,
-        { kind: "file", fileName: file.name, fileSize: file.size },
-        `${file.name} loaded.`,
-      );
+      const parsed = JSON.parse(await file.text()) as unknown;
+      accept("file", parsed, {
+        kind: "file",
+        fileName: file.name,
+        fileSize: file.size,
+      });
     } catch (error) {
-      setSourceError([
+      setLoaded((entries) => ({ ...entries, file: undefined }));
+      setKindIssues("file", [
         error instanceof SyntaxError
           ? "That file does not contain valid JSON."
           : errorMessage(error),
       ]);
-      toast.error("Could not read that file.");
     } finally {
-      setSourceBusy(false);
+      setBusy(false);
     }
   };
 
-  const handlePaste = () => {
-    if (!paste.trim()) {
-      setSourceError(["Paste an ABI JSON array or artifact first."]);
+  const loadUrl = async () => {
+    const target = url.trim();
+    if (!target) {
+      setKindIssues("url", ["Enter a URL that returns ABI JSON."]);
       return;
     }
-    let parsed: unknown;
+    setBusy(true);
+    setKindIssues("url", []);
     try {
-      parsed = JSON.parse(paste);
-    } catch {
-      setSourceError(["That is not valid JSON. Check for missing braces or commas."]);
-      return;
-    }
-    acceptAbi(parsed, { kind: "paste" }, "Pasted ABI loaded.");
-  };
-
-  const handleUrl = async () => {
-    if (!url.trim()) {
-      setSourceError(["Enter a URL that returns ABI JSON."]);
-      return;
-    }
-    setSourceBusy(true);
-    setSourceError([]);
-    try {
-      const result = await fetchAbiFromUrl(url);
-      acceptAbi(result, { kind: "url", url: url.trim() }, "ABI fetched from URL.");
+      const result = await fetchAbiFromUrl(target);
+      accept("url", result, { kind: "url", url: target });
     } catch (error) {
-      setSourceError([errorMessage(error)]);
-      toast.error("Could not fetch that ABI.");
+      setLoaded((entries) => ({ ...entries, url: undefined }));
+      setKindIssues("url", [errorMessage(error)]);
     } finally {
-      setSourceBusy(false);
+      setBusy(false);
     }
   };
 
-  const handleExplorer = async () => {
-    if (!normalizedAddress) {
-      setSourceError(["Enter a valid contract address in the binding panel first."]);
-      return;
-    }
-    if (!settings.etherscanKey.trim()) {
-      setSourceError([
-        "Add your Etherscan API key in Settings, or use a file, paste, or URL instead.",
-      ]);
-      return;
-    }
-    setSourceBusy(true);
-    setSourceError([]);
+  const loadExplorer = async () => {
+    if (!normalizedAddress) return;
+    setBusy(true);
+    setKindIssues("explorer", []);
     try {
       const result = await fetchExplorerAbi(
         chainId,
         normalizedAddress,
         settings.etherscanKey,
       );
-      acceptAbi(
-        result,
-        { kind: "explorer", provider: "etherscan", verified: true },
-        "Verified ABI loaded from Etherscan.",
-      );
+      accept("explorer", result, {
+        kind: "explorer",
+        provider: "etherscan",
+        verified: true,
+      });
     } catch (error) {
-      setSourceError([errorMessage(error)]);
-      toast.error("Explorer lookup failed.");
+      setLoaded((entries) => ({ ...entries, explorer: undefined }));
+      setKindIssues("explorer", [errorMessage(error)]);
     } finally {
-      setSourceBusy(false);
+      setBusy(false);
     }
   };
 
-  const canOpen = Boolean(
-    imported &&
+  const suggestedName =
+    existing?.name ??
+    (current?.source.kind === "file"
+      ? current.source.fileName.replace(/\.json$/i, "")
+      : "");
+
+  const canSave = Boolean(
+    current &&
       normalizedAddress &&
-      !sourceBusy &&
+      !busy &&
       !codeQuery.isLoading &&
-      (codeQuery.isError || (codeQuery.data?.codeSize ?? 0) > 0),
+      !noCode,
   );
 
-  const openWorkspace = (saveOnly = false) => {
-    if (!imported || !normalizedAddress || !abiSource) {
-      toast.error("Load an ABI and enter a valid address first.");
-      return;
-    }
-    if (codeQuery.data && codeQuery.data.codeSize === 0) {
-      toast.error("There is no contract code at that address on this chain.");
-      return;
-    }
-
+  const save = () => {
+    if (!current || !normalizedAddress) return;
     try {
-      const revision = createRevision(imported, abiSource);
+      const revision = createRevision(current.imported, current.source);
       const binding = saveContract({
-        name: name.trim() || existing?.name || "",
+        name: name.trim() || suggestedName,
         chainId,
         address: normalizedAddress,
         revisionId: revision.id,
         codeInfo: codeQuery.data,
       });
       updateSettings({ lastChainId: chainId });
-      if (saveOnly) {
-        toast.success(`${binding.name} saved.`);
-        navigate("/");
-        return;
-      }
-      toast.success(
-        existing ? "Contract ABI updated." : "Contract added to your workspace.",
-      );
-      navigate(`/contract/${binding.chainId}/${binding.address}/overview`);
+      toast.success(existing ? "ABI updated." : "Contract added.");
+      navigate(`/contract/${binding.chainId}/${binding.address}`);
     } catch (error) {
       toast.error(errorMessage(error));
     }
   };
 
-  const abiSummary = imported ? (
-    <div className="abi-summary">
-      <div className="abi-summary-heading">
-        <div>
-          <p className="eyebrow">LOADED ABI</p>
-          <h3>{abiSource ? sourceLabel(abiSource) : "ABI"}</h3>
-        </div>
-        <Badge tone="green">
-          <Check size={12} /> Validated
-        </Badge>
-      </div>
-
-      <dl className="abi-summary-grid">
-        <div>
-          <dt>Hash</dt>
-          <dd className="mono">
-            {shortHash(imported.hash, 10)}
-            <CopyButton value={imported.hash} label="Copy ABI hash" compact />
-          </dd>
-        </div>
-        <div>
-          <dt>Functions</dt>
-          <dd>
-            {imported.counts.functions}
-            <small>
-              {imported.counts.readFunctions} read ·{" "}
-              {imported.counts.writeFunctions} write
-            </small>
-          </dd>
-        </div>
-        <div>
-          <dt>Events</dt>
-          <dd>{imported.counts.events}</dd>
-        </div>
-        <div>
-          <dt>Errors</dt>
-          <dd>{imported.counts.errors}</dd>
-        </div>
-      </dl>
-
-      {imported.warnings.length > 0 && (
-        <div className="warning-list">
-          <p className="eyebrow">NOTES</p>
-          {imported.warnings.slice(0, 4).map((warning) => (
-            <p key={warning}>{warning}</p>
-          ))}
-        </div>
-      )}
-
-      <div className="abi-summary-foot">
-        <span className="mono">{shortSignature(imported.hash, 42)}</span>
-        <Badge tone="muted">JSON preserved</Badge>
-      </div>
-    </div>
-  ) : (
-    <div className="abi-summary is-empty">
-      <span className="abi-summary-empty-icon">
-        <Braces size={20} />
-      </span>
-      <strong>No ABI loaded yet</strong>
-      <p>
-        Choose a source on the left. A bare array or an artifact with an{" "}
-        <code>abi</code> field both work.
-      </p>
-    </div>
-  );
-
   const codeStatus = (() => {
-    if (!normalizedAddress) {
+    if (!trimmedAddress) return null;
+    if (!addressValid) {
       return (
-        <p className="check-line muted">
-          <CircleHelp size={14} /> Enter an address to check for code.
+        <p className="status-line danger">
+          <CircleAlert size={14} /> Not a valid address.
         </p>
       );
     }
     if (codeQuery.isLoading) {
       return (
-        <p className="check-line muted">
-          <Loader2 size={14} className="spin" /> Checking code on{" "}
-          {chainName(chainId)}…
+        <p className="status-line muted">
+          <Loader2 size={14} className="spin" /> Checking {chainName(chainId)}…
         </p>
       );
     }
     if (codeQuery.isError) {
       return (
-        <p className="check-line warning">
-          <ShieldAlert size={14} /> Could not verify code:{" "}
-          {errorMessage(codeQuery.error)}
+        <p className="status-line warning">
+          <AlertTriangle size={14} /> Couldn’t reach {chainName(chainId)} to
+          check this address. You can still save it.
         </p>
       );
     }
-    if (codeQuery.data?.codeSize === 0) {
+    if (noCode) {
       return (
-        <p className="check-line danger">
-          <ShieldAlert size={14} /> No contract code at this address on{" "}
-          {chainName(chainId)}.
+        <p className="status-line danger">
+          <CircleAlert size={14} /> No contract at this address on{" "}
+          {chainName(chainId)}. Check the network.
         </p>
       );
     }
+    const proxy = codeQuery.data?.proxy;
     return (
-      <p className="check-line success">
-        <ShieldCheck size={14} /> Contract found ·{" "}
-        {codeQuery.data?.codeSize ?? 0} bytes ·{" "}
-        {codeQuery.data?.proxy ? "proxy detected" : "no proxy detected"}
+      <p className="status-line success">
+        <Check size={14} /> Contract found
+        {proxy && (
+          <>
+            {" "}· {proxyLabel(proxy)}
+            {"implementation" in proxy && proxy.implementation && (
+              <>
+                , implementation{" "}
+                <span className="mono">{shortenAddress(proxy.implementation)}</span>
+                . Use the implementation’s ABI.
+              </>
+            )}
+          </>
+        )}
       </p>
     );
   })();
 
+  const explorerKeyMissing = !settings.etherscanKey.trim();
+
   return (
-    <div className="page import-page">
+    <div className="page page-narrow">
       <PageHeader
-        eyebrow="NEW WORKSPACE"
-        title="Import a contract"
-        description="Bind an ABI you already have to a deployed address. Explorer verification is optional, never required."
-        actions={
-          <Button
-            variant="ghost"
-            icon={<ArrowLeft size={15} />}
-            onClick={() => navigate("/")}
-          >
-            Back to contracts
-          </Button>
-        }
+        title={existing ? "Update contract ABI" : "Add contract"}
+        description="Enter where the contract is deployed, then provide its ABI."
       />
 
-      <ol className="wizard-steps" aria-label="Import steps">
-        <li className={cn(imported ? "done" : "active")}>
-          <span>{imported ? <Check size={13} /> : "1"}</span>
-          Load ABI
-        </li>
-        <li className={cn(imported ? "active" : "")}>
-          <span>2</span>
-          Bind address
-        </li>
-        <li>
-          <span>3</span>
-          Review & open
-        </li>
-      </ol>
+      <div className="form-card">
+        <div className="form-row two">
+          <label className="field-group">
+            <span className="field-label">Network</span>
+            <select
+              className="field"
+              value={chainId}
+              onChange={(event) => setChainId(Number(event.target.value))}
+            >
+              <optgroup label="Mainnets">
+                {mainnets.map((chain) => (
+                  <option key={chain.id} value={chain.id}>
+                    {chain.name}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Testnets & local">
+                {testnets.map((chain) => (
+                  <option key={chain.id} value={chain.id}>
+                    {chain.name}
+                  </option>
+                ))}
+              </optgroup>
+            </select>
+          </label>
 
-      <div className="import-layout">
-        <section className="panel import-source-panel">
-          <div className="panel-heading">
+          <label className="field-group">
+            <span className="field-label">Contract address</span>
+            <input
+              className={cn("field mono", trimmedAddress && !addressValid && "invalid")}
+              value={address}
+              onChange={(event) => setAddress(event.target.value)}
+              placeholder="0x…"
+              spellCheck={false}
+              autoComplete="off"
+            />
+          </label>
+        </div>
+        {codeStatus}
+
+        {existing && (
+          <div className="notice info">
             <div>
-              <p className="eyebrow">STEP 01</p>
-              <h2>Interface source</h2>
+              <strong>{existing.name} is already saved.</strong>{" "}
+              Saving again replaces its ABI; the old one stays in its ABI
+              history.{" "}
+              <Link
+                className="text-link"
+                to={`/contract/${existing.chainId}/${existing.address}`}
+              >
+                Open it
+              </Link>
             </div>
-            {imported && <Badge tone="teal">{imported.counts.functions} fns</Badge>}
           </div>
+        )}
 
-          <div className="segmented source-tabs" role="tablist" aria-label="ABI source">
-            {SOURCE_TABS.map(({ id, label, icon: Icon }) => (
+        <div className="form-section">
+          <span className="field-label">ABI</span>
+          <div className="segmented" role="tablist" aria-label="ABI source">
+            {SOURCE_TABS.map(({ id, label }) => (
               <button
                 key={id}
                 type="button"
                 role="tab"
                 aria-selected={sourceKind === id}
                 className={cn(sourceKind === id && "selected")}
-                onClick={() => {
-                  setSourceKind(id);
-                  setSourceError([]);
-                }}
+                onClick={() => setSourceKind(id)}
               >
-                <Icon size={14} />
                 {label}
               </button>
             ))}
           </div>
+
+          {sourceKind === "paste" && (
+            <textarea
+              className="field mono textarea"
+              value={paste}
+              onChange={(event) => setPaste(event.target.value)}
+              placeholder={'[{"type":"function","name":"balanceOf", …}]\n\nA bare ABI array or a full Foundry/Hardhat artifact both work.'}
+              spellCheck={false}
+              aria-label="ABI JSON"
+            />
+          )}
 
           {sourceKind === "file" && (
             <div
@@ -499,7 +461,12 @@ export function ImportPage() {
                 event.preventDefault();
                 setDragging(true);
               }}
-              onDragLeave={() => setDragging(false)}
+              onDragLeave={(event) => {
+                // Ignore leave events fired when moving over child elements.
+                if (!event.currentTarget.contains(event.relatedTarget as Node)) {
+                  setDragging(false);
+                }
+              }}
               onDrop={(event) => {
                 event.preventDefault();
                 setDragging(false);
@@ -520,355 +487,118 @@ export function ImportPage() {
                   if (file) void readFile(file);
                 }}
               />
-              <span className="drop-zone-icon">
-                <Upload size={20} />
-              </span>
-              <strong>
-                {fileName || "Drop a Foundry, Hardhat, or ABI JSON file"}
-              </strong>
+              <Upload size={18} className="muted" />
               <p>
-                The whole artifact or a bare array works. Nothing is uploaded.
+                {fileName ? (
+                  <strong className="mono">{fileName}</strong>
+                ) : (
+                  "Drop a JSON file here, or"
+                )}
               </p>
               <Button
-                variant="secondary"
                 size="sm"
-                loading={sourceBusy}
+                loading={busy}
                 onClick={() => fileRef.current?.click()}
               >
-                Browse files
+                {fileName ? "Choose another file" : "Choose file"}
               </Button>
-              <small>JSON · up to 5 MB</small>
-            </div>
-          )}
-
-          {sourceKind === "paste" && (
-            <div className="source-form">
-              <label className="field-label" htmlFor="abi-paste">
-                ABI JSON
-              </label>
-              <textarea
-                id="abi-paste"
-                className="field mono textarea"
-                value={paste}
-                onChange={(event) => setPaste(event.target.value)}
-                placeholder={'[{"type":"function","name":"balanceOf",…}]'}
-                spellCheck={false}
-              />
-              <div className="source-form-actions">
-                <Button
-                  variant="primary"
-                  icon={<Braces size={15} />}
-                  onClick={handlePaste}
-                >
-                  Validate & load
-                </Button>
-                <span className="hint">Kept in this browser only.</span>
-              </div>
+              <small className="muted">
+                Foundry <code>out/</code>, Hardhat <code>artifacts/</code>, or a
+                plain ABI array
+              </small>
             </div>
           )}
 
           {sourceKind === "url" && (
-            <div className="source-form">
-              <label className="field-label" htmlFor="abi-url">
-                HTTPS URL
-              </label>
-              <div className="inline-field">
-                <input
-                  id="abi-url"
-                  className="field mono"
-                  value={url}
-                  onChange={(event) => setUrl(event.target.value)}
-                  placeholder="https://example.com/MyContract.json"
-                  spellCheck={false}
-                />
-                <Button
-                  variant="primary"
-                  loading={sourceBusy}
-                  disabled={!urlPreview || urlPreview.invalid || !urlPreview.secure}
-                  onClick={() => void handleUrl()}
-                >
-                  Fetch
-                </Button>
-              </div>
-              {urlPreview && (
-                <div className="url-preview">
-                  {urlPreview.invalid ? (
-                    <p className="check-line warning">
-                      <AlertTriangle size={13} /> Enter a full URL, including
-                      https://.
-                    </p>
-                  ) : (
-                    <>
-                      <span className="url-origin mono">{urlPreview.origin}</span>
-                      <span className="url-path mono">{urlPreview.path}</span>
-                      {!urlPreview.secure && (
-                        <p className="check-line warning">
-                          <AlertTriangle size={13} /> Only HTTPS endpoints are
-                          fetched. HTTP is allowed for localhost.
-                        </p>
-                      )}
-                    </>
-                  )}
-                </div>
-              )}
-              <p className="hint">
-                The host must allow cross-origin requests. Localhost is allowed
-                for development.
-              </p>
+            <div className="inline-field">
+              <input
+                className="field mono"
+                value={url}
+                onChange={(event) => setUrl(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") void loadUrl();
+                }}
+                placeholder="https://example.com/MyContract.json"
+                spellCheck={false}
+                aria-label="ABI URL"
+              />
+              <Button loading={busy} onClick={() => void loadUrl()}>
+                Load
+              </Button>
             </div>
           )}
 
           {sourceKind === "explorer" && (
-            <div className="source-form">
-              <div className="explorer-note">
-                <ShieldAlert size={16} />
-                <div>
-                  <strong>Verified contracts only</strong>
-                  <p>
-                    This optional lookup asks Etherscan for a published ABI.
-                    Unverified contracts will fail here — use a local artifact
-                    instead.
-                  </p>
-                </div>
-              </div>
-
-              {settings.etherscanKey ? (
-                <p className="check-line success">
-                  <KeyRound size={14} /> Using your local Etherscan key.
+            <div className="explorer-source">
+              <p className="muted">
+                Fetches the ABI of a contract that is verified on Etherscan.
+              </p>
+              {explorerKeyMissing ? (
+                <p className="status-line warning">
+                  <AlertTriangle size={14} />
+                  <span>
+                    Needs an Etherscan API key.{" "}
+                    <Link to="/settings" className="text-link">
+                      Add one in Settings
+                    </Link>
+                  </span>
+                </p>
+              ) : !explorerAbiSupported(chainId) ? (
+                <p className="status-line warning">
+                  <AlertTriangle size={14} /> Etherscan isn’t available for{" "}
+                  {chainName(chainId)}.
                 </p>
               ) : (
-                <p className="check-line warning">
-                  <KeyRound size={14} /> No key set.{" "}
-                  <Link to="/settings" className="text-link">
-                    Add one in Settings
-                  </Link>
-                  .
-                </p>
-              )}
-
-              <div className="explorer-target">
-                <span className="mono">
-                  {normalizedAddress ?? "Enter an address on the right"}
-                </span>
-                <ChainBadge chainId={chainId} />
-              </div>
-
-              <Button
-                variant="primary"
-                loading={sourceBusy}
-                disabled={!normalizedAddress || !explorerAbiSupported(chainId)}
-                onClick={() => void handleExplorer()}
-              >
-                <Globe2 size={15} /> Look up verified ABI
-              </Button>
-              {!explorerAbiSupported(chainId) && (
-                <p className="hint">
-                  Etherscan lookup is not available for {chainName(chainId)}.
-                </p>
+                <Button
+                  loading={busy}
+                  disabled={!normalizedAddress}
+                  onClick={() => void loadExplorer()}
+                >
+                  {normalizedAddress
+                    ? `Fetch ABI for ${shortenAddress(normalizedAddress)}`
+                    : "Enter an address above first"}
+                </Button>
               )}
             </div>
           )}
 
-          {sourceError.length > 0 && <IssueList issues={sourceError} />}
+          <IssueList issues={currentIssues} />
+          {current && <AbiSummary imported={current.imported} />}
+        </div>
 
-          <div className="source-or">
-            <span>or</span>
-          </div>
+        <label className="field-group form-section">
+          <span className="field-label">
+            Name <span className="muted">(optional)</span>
+          </span>
+          <input
+            className="field"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder={suggestedName || "e.g. Token, Vault"}
+          />
+        </label>
 
-          {abiSummary}
-        </section>
-
-        <section className="panel import-bind-panel">
-          <div className="panel-heading">
-            <div>
-              <p className="eyebrow">STEP 02</p>
-              <h2>Contract binding</h2>
-            </div>
-            {existing && <Badge tone="amber">Already saved</Badge>}
-          </div>
-
-          <div className="form-grid">
-            <label className="field-group">
-              <span className="field-label">Contract name</span>
-              <input
-                className="field"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                placeholder={existing?.name ?? "e.g. Treasury Vault"}
-              />
-              <small>Optional. Shown only in this workspace.</small>
-            </label>
-
-            <label className="field-group">
-              <span className="field-label">Contract address</span>
-              <input
-                className={cn(
-                  "field mono",
-                  address && !addressValid && "invalid",
-                )}
-                value={address}
-                onChange={(event) => setAddress(event.target.value)}
-                placeholder="0x…"
-                spellCheck={false}
-              />
-              <small className={cn(address && !addressValid && "danger-text")}>
-                {address && !addressValid
-                  ? "That is not a valid EVM address."
-                  : "EIP-55 checksum applied automatically."}
-              </small>
-            </label>
-
-            <label className="field-group">
-              <span className="field-label">Network</span>
-              <select
-                className="field"
-                value={chainId}
-                onChange={(event) => setChainId(Number(event.target.value))}
-              >
-                {CHAINS.map((chain) => (
-                  <option key={chain.id} value={chain.id}>
-                    {chainName(chain.id)}
-                    {chain.testnet ? " · testnet" : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          <div className="code-check">
-            <div className="code-check-heading">
-              <span className="eyebrow">CODE CHECK</span>
-              <Badge tone={codeQuery.data?.codeSize ? "green" : "muted"}>
-                {codeQuery.data?.codeSize
-                  ? `${codeQuery.data.codeSize} bytes`
-                  : "Not loaded"}
-              </Badge>
-            </div>
-            {codeStatus}
-            {codeQuery.data?.proxy && (
-              <p className="check-line warning">
-                <ShieldAlert size={14} /> Proxy detected:{" "}
-                {codeQuery.data.proxy.kind.replace("eip", "EIP-")}
-                {"implementation" in codeQuery.data.proxy &&
-                  codeQuery.data.proxy.implementation && (
-                    <span className="mono">
-                      {" "}
-                      → {shortHash(codeQuery.data.proxy.implementation, 6)}
-                    </span>
-                  )}
-              </p>
-            )}
-          </div>
-
-          {existing && (
-            <div className="existing-contract">
-              <div>
-                <p className="eyebrow">EXISTING BINDING</p>
-                <strong>{existing.name}</strong>
-                <small>
-                  Current ABI {existingRevision ? shortHash(existingRevision.hash, 8) : "unknown"}
-                </small>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() =>
-                  navigate(
-                    `/contract/${existing.chainId}/${existing.address}/overview`,
-                  )
-                }
-              >
-                Open existing <ArrowRight size={14} />
-              </Button>
-            </div>
+        <div className="form-actions">
+          <Button variant="primary" disabled={!canSave} onClick={save}>
+            {existing ? "Save ABI" : "Add contract"}
+          </Button>
+          <Button variant="ghost" onClick={() => navigate("/")}>
+            Cancel
+          </Button>
+          {!canSave && (
+            <span className="muted form-hint">
+              {!normalizedAddress
+                ? "Enter a contract address."
+                : !current
+                  ? "Provide an ABI."
+                  : noCode
+                    ? "No contract at this address."
+                    : codeQuery.isLoading
+                      ? "Checking the address…"
+                      : ""}
+            </span>
           )}
-
-          <div className="review-box">
-            <p className="eyebrow">STEP 03 · REVIEW</p>
-            <dl className="review-list">
-              <div>
-                <dt>ABI</dt>
-                <dd>
-                  {imported ? (
-                    <span className="mono">{shortHash(imported.hash, 9)}</span>
-                  ) : (
-                    <span className="muted">Not loaded</span>
-                  )}
-                </dd>
-              </div>
-              <div>
-                <dt>Address</dt>
-                <dd className="mono">
-                  {normalizedAddress ?? <span className="muted">Not set</span>}
-                </dd>
-              </div>
-              <div>
-                <dt>Chain</dt>
-                <dd>
-                  <ChainBadge chainId={chainId} />
-                </dd>
-              </div>
-              <div>
-                <dt>Code</dt>
-                <dd>
-                  {codeQuery.isLoading
-                    ? "Checking…"
-                    : codeQuery.data?.codeSize
-                      ? "Contract present"
-                      : codeQuery.isError
-                        ? "Unverified (RPC error)"
-                        : "Missing"}
-                </dd>
-              </div>
-            </dl>
-          </div>
-
-          <div className="binding-actions">
-            <Button
-              variant="primary"
-              size="lg"
-              icon={<ArrowRight size={16} />}
-              disabled={!canOpen}
-              onClick={() => openWorkspace(false)}
-            >
-              {existing ? "Update ABI & open" : "Open workspace"}
-            </Button>
-            <Button
-              variant="secondary"
-              size="lg"
-              disabled={!canOpen}
-              onClick={() => openWorkspace(true)}
-            >
-              Save without opening
-            </Button>
-          </div>
-
-          {!imported && (
-            <p className="binding-hint">
-              Load an ABI from step 01 to enable this action.
-            </p>
-          )}
-          {codeQuery.data?.codeSize === 0 && (
-            <p className="binding-hint danger-text">
-              This address has no code on {chainName(chainId)}. Check the chain
-              and address before continuing.
-            </p>
-          )}
-          {!walletAddress && (
-            <p className="binding-hint">
-              A wallet is only needed for write methods. Reads work without one.
-            </p>
-          )}
-        </section>
-      </div>
-
-      <div className="import-footnote">
-        <Hash size={14} />
-        <span>
-          The ABI hash is computed locally and stored with this contract
-          revision. It is derived from the exact JSON you imported.
-        </span>
-        <span className="mono">{absoluteTime(openedAt)}</span>
+        </div>
       </div>
     </div>
   );

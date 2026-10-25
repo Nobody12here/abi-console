@@ -1,10 +1,9 @@
 import { Link } from "react-router-dom";
-import { ArrowUpRight, FileCode2, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import type { AbiRevision, ContractBinding } from "@/features/abi/types";
 import { ChainBadge } from "@/components/ui/ChainBadge";
 import { CopyButton } from "@/components/ui/CopyButton";
-import { shortHash, shortenAddress, relativeTime } from "@/lib/format";
-import { sourceKindLabel } from "@/features/abi/source";
+import { shortenAddress, relativeTime } from "@/lib/format";
 
 export function ContractRow({
   binding,
@@ -15,62 +14,45 @@ export function ContractRow({
   revision: AbiRevision | undefined;
   onDelete: (binding: ContractBinding) => void;
 }) {
-  return (
-    <div className="contract-row">
-      <Link
-        className="contract-row-main"
-        to={`/contract/${binding.chainId}/${binding.address}/overview`}
-      >
-        <span className="contract-row-icon">
-          <FileCode2 size={16} />
-        </span>
-        <span className="contract-row-identity">
-          <span className="contract-row-name">{binding.name}</span>
-          <span className="contract-row-meta mono">
-            {shortenAddress(binding.address, 6)}
-          </span>
-        </span>
-        <span className="contract-row-chain">
-          <ChainBadge chainId={binding.chainId} />
-        </span>
-        <span className="contract-row-methods">
-          {revision ? (
-            <>
-              <span>{revision.counts.readFunctions} read</span>
-              <i />
-              <span>{revision.counts.writeFunctions} write</span>
-            </>
-          ) : (
-            <span className="muted">No ABI</span>
-          )}
-        </span>
-        <span className="contract-row-hash mono" title={revision?.hash}>
-          {revision ? shortHash(revision.hash, 4) : "—"}
-        </span>
-        <span className="contract-row-source">
-          {revision ? sourceKindLabel(revision.source) : "—"}
-        </span>
-        <span className="contract-row-time">{relativeTime(binding.lastOpenedAt)}</span>
-        <ArrowUpRight size={15} className="contract-row-open" />
-      </Link>
+  // A name equal to the address adds nothing, so show the short form instead.
+  const unnamed = binding.name === binding.address;
 
-      <div className="contract-row-actions">
-        <CopyButton
-          value={binding.address}
-          label="Copy address"
-          compact
-          className="row-action"
-        />
+  return (
+    <div className="table-row contract-grid">
+      <div className="contract-cell-name">
+        <Link
+          className="contract-link"
+          to={`/contract/${binding.chainId}/${binding.address}`}
+        >
+          {unnamed ? shortenAddress(binding.address, 6) : binding.name}
+        </Link>
+        <span className="contract-address mono">
+          {shortenAddress(binding.address, 6)}
+          <CopyButton value={binding.address} label="Copy address" compact />
+        </span>
+      </div>
+      <span className="cell" data-label="Network">
+        <ChainBadge chainId={binding.chainId} />
+      </span>
+      <span className="cell muted" data-label="Functions">
+        {revision
+          ? `${revision.counts.readFunctions} read · ${revision.counts.writeFunctions} write`
+          : "No ABI"}
+      </span>
+      <span className="cell muted" data-label="Last opened">
+        {relativeTime(binding.lastOpenedAt)}
+      </span>
+      <span className="cell cell-actions">
         <button
           type="button"
-          className="row-action danger"
-          aria-label={`Delete ${binding.name}`}
-          title="Delete contract"
+          className="icon-btn small danger"
+          aria-label={`Remove ${binding.name}`}
+          title="Remove contract"
           onClick={() => onDelete(binding)}
         >
           <Trash2 size={14} />
         </button>
-      </div>
+      </span>
     </div>
   );
 }

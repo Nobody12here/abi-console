@@ -25,30 +25,20 @@ export default function App() {
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </main>
-      <footer className="app-footer">
-        <div className="app-footer-inner">
-          <span>
-            ABI Console · local-first contract workbench
-          </span>
-          <span className="footer-note">
-            ABI is data, not trust. The selector is the ground truth.
-          </span>
-        </div>
-      </footer>
       <Toaster
         position="bottom-right"
         toastOptions={{
-          duration: 4200,
+          duration: 4000,
           style: {
-            background: "var(--surface-2)",
+            background: "var(--surface)",
             color: "var(--text)",
-            border: "1px solid var(--line-strong)",
-            borderRadius: "10px",
+            border: "1px solid var(--border-strong)",
+            borderRadius: "6px",
             fontSize: "13px",
-            boxShadow: "var(--shadow-lg)",
+            boxShadow: "var(--shadow)",
           },
-          success: { iconTheme: { primary: "var(--green)", secondary: "var(--surface-2)" } },
-          error: { iconTheme: { primary: "var(--coral)", secondary: "var(--surface-2)" } },
+          success: { iconTheme: { primary: "var(--green)", secondary: "var(--surface)" } },
+          error: { iconTheme: { primary: "var(--red)", secondary: "var(--surface)" } },
         }}
       />
     </div>

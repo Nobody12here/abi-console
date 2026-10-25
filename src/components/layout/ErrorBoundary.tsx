@@ -21,15 +21,11 @@ export class ErrorBoundary extends Component<Props, State> {
     return (
       <div className="crash-screen">
         <div className="crash-card">
-          <span className="crash-icon">
-            <TriangleAlert size={22} />
-          </span>
-          <p className="eyebrow">RENDER FAILURE</p>
-          <h1>ABI Console hit an unexpected error</h1>
+          <TriangleAlert size={20} className="crash-icon" />
+          <h1>Something went wrong</h1>
           <p>
-            Your saved contracts are still in this browser. Reload the console
-            to continue. If the problem repeats, export your data from Settings
-            after reloading.
+            Your saved contracts are still in this browser. Reload the page to
+            continue. If it keeps happening, export your data from Settings.
           </p>
           <pre>{this.state.error.message}</pre>
           <button
@@ -37,7 +33,7 @@ export class ErrorBoundary extends Component<Props, State> {
             className="btn btn-primary"
             onClick={() => window.location.assign("/")}
           >
-            <RotateCcw size={15} /> Reload console
+            <RotateCcw size={15} /> Reload
           </button>
         </div>
       </div>

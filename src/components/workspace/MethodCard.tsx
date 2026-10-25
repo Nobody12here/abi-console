@@ -1,24 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useAccount, useBalance, useWalletClient } from "wagmi";
+import { useAccount, useWalletClient } from "wagmi";
 import { useQuery } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import {
   Check,
   ChevronRight,
-  ClipboardPaste,
-  Code2,
-  Copy,
-  FlaskConical,
   Info,
-  KeyRound,
   Loader2,
-  Play,
-  RefreshCw,
   RotateCcw,
-  Send,
-  ShieldAlert,
   TriangleAlert,
-  Wallet,
 } from "lucide-react";
 import {
   encodeFunctionData,
@@ -33,11 +23,10 @@ import type {
 } from "@/features/abi/types";
 import {
   type AbiFunctionItem,
-  formatInputLabel,
   canonicalParameterType,
+  formatInputLabel,
   functionSignature,
   functionSelector,
-  outputSummary,
 } from "@/features/abi/utils";
 import {
   buildFields,
@@ -53,16 +42,15 @@ import { createReadClient } from "@/lib/rpc";
 import {
   formatNativeValue,
   parseNativeValue,
+  previewValue,
   toJson,
   copyText,
 } from "@/lib/format";
 import { chainName, getChain } from "@/lib/chains";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { CopyButton } from "@/components/ui/CopyButton";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { ChainBadge } from "@/components/ui/ChainBadge";
 import { ArgsForm } from "./ArgsForm";
 import { ResultView } from "./ResultView";
 import { TransactionProgress } from "./TransactionProgress";
@@ -72,6 +60,11 @@ type SimState =
   | { status: "running" }
   | { status: "success"; gas?: bigint; result?: unknown }
   | { status: "error"; message: string; decodedName?: string };
+
+export type MethodPreview =
+  | { status: "loading" }
+  | { status: "ok"; value: unknown }
+  | { status: "error" };
 
 function encodeCall(fn: AbiFunctionItem, args: unknown[]): Hex {
   return encodeFunctionData({
@@ -96,6 +89,7 @@ export function MethodCard({
   mode,
   open,
   onToggle,
+  preview,
 }: {
   contract: ContractBinding;
   revision: AbiRevision;
@@ -103,6 +97,8 @@ export function MethodCard({
   mode: "read" | "write";
   open: boolean;
   onToggle: () => void;
+  /** Auto-read value for view functions that take no arguments. */
+  preview?: MethodPreview;
 }) {
   const { settings, txs, addTx, updateTx } = useWorkspace();
   const { address: account, chainId: walletChainId, isConnected } = useAccount();
@@ -124,7 +120,6 @@ export function MethodCard({
   const [errors, setErrors] = useState<ArgErrors>({});
   const [valueInput, setValueInput] = useState("");
   const [valueUnit, setValueUnit] = useState<"native" | "wei">("native");
-  const [jsonOpen, setJsonOpen] = useState(false);
   const [jsonText, setJsonText] = useState("");
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [blockInput, setBlockInput] = useState("");
@@ -170,17 +165,28 @@ export function MethodCard({
     }
   }, [payable, valueInput, valueUnit]);
 
-  const balance = useBalance({
-    address: account,
-    chainId: contract.chainId,
-    query: { enabled: Boolean(account) && payable },
+  // Read the balance through the same RPC as everything else, so a custom
+  // RPC (for example a local node on another port) is respected.
+  const balance = useQuery({
+    queryKey: [
+      "balance",
+      contract.chainId,
+      account,
+      settings.rpcOverrides[contract.chainId] ?? "",
+    ],
+    enabled: Boolean(account) && payable && open,
+    staleTime: 15_000,
+    queryFn: () =>
+      createReadClient(contract.chainId, settings.rpcOverrides).getBalance({
+        address: account as Address,
+      }),
   });
 
   const insufficientBalance =
     payable &&
     !parsedValue.error &&
     balance.data !== undefined &&
-    parsedValue.wei > balance.data.value;
+    parsedValue.wei > balance.data;
 
   const readEnabled = Boolean(readRequest) && mode === "read";
   const readQuery = useQuery({
@@ -222,16 +228,14 @@ export function MethodCard({
     : undefined;
   const txInFlight =
     activeTx !== undefined &&
-    (activeTx.status === "awaiting-signature" ||
-      activeTx.status === "pending" ||
-      activeTx.status === "confirmed");
+    (activeTx.status === "awaiting-signature" || activeTx.status === "pending");
 
   const argsDirty =
     readRequest !== null &&
     toJson(readRequest.args, 0) !== toJson(collected.args, 0);
 
   const rememberArgs = (args: unknown[]) => {
-    if (!settings.rememberArgs) return;
+    if (!settings.rememberArgs || args.length === 0) return;
     try {
       localStorage.setItem(argsKey, fieldsToArgsPreview(args));
     } catch {
@@ -289,7 +293,7 @@ export function MethodCard({
     const result = collectArgs(fn.inputs, fields);
     setErrors(result.errors);
     if (Object.keys(result.errors).length > 0) {
-      toast.error("Fix the highlighted inputs before querying.");
+      toast.error("Fix the highlighted inputs first.");
       return;
     }
     let block: bigint | undefined;
@@ -298,7 +302,7 @@ export function MethodCard({
         block = BigInt(blockInput.trim());
         if (block < 0n) throw new Error("negative");
       } catch {
-        setBlockError("Enter a positive block number, or leave it empty for latest.");
+        setBlockError("Enter a block number, or leave it empty for the latest block.");
         return;
       }
     }
@@ -311,11 +315,11 @@ export function MethodCard({
     const result = collectArgs(fn.inputs, fields);
     setErrors(result.errors);
     if (Object.keys(result.errors).length > 0) {
-      toast.error("Fix the highlighted inputs before simulating.");
+      toast.error("Fix the highlighted inputs first.");
       return;
     }
     if (!isConnected || !account) {
-      toast.error("Connect a wallet to simulate a write.");
+      toast.error("Connect a wallet first.");
       return;
     }
     if (!chainMatch) {
@@ -332,38 +336,31 @@ export function MethodCard({
     }
 
     setSim({ status: "running" });
+    // Keep a pending transaction's progress visible until it settles.
+    if (!txInFlight) setActiveTxId(null);
     try {
       const client = createReadClient(contract.chainId, settings.rpcOverrides);
-      const simulation = (await client.simulateContract({
+      const request = {
         address: contract.address as Address,
         abi: [fn] as Abi,
         functionName: fn.name,
         args: result.args,
         account: account as Address,
         value: parsedValue.wei,
-      } as never)) as { result?: unknown };
+      } as never;
+      const simulation = (await client.simulateContract(request)) as {
+        result?: unknown;
+      };
 
       let gas: bigint | undefined;
       try {
-        gas = await client.estimateContractGas({
-          address: contract.address as Address,
-          abi: [fn] as Abi,
-          functionName: fn.name,
-          args: result.args,
-          account: account as Address,
-          value: parsedValue.wei,
-        } as never);
+        gas = await client.estimateContractGas(request);
       } catch {
         gas = undefined;
       }
 
-      setSim({
-        status: "success",
-        gas,
-        result: simulation.result,
-      });
+      setSim({ status: "success", gas, result: simulation.result });
       rememberArgs(result.args);
-      toast.success("Simulation succeeded.");
     } catch (error) {
       const decoded = decodeContractError(error, revision.abi);
       setSim({
@@ -371,13 +368,12 @@ export function MethodCard({
         message: decoded.message,
         decodedName: decoded.decodedName,
       });
-      toast.error("Simulation reverted.");
     }
   };
 
   const sendWrite = async () => {
     if (!walletClient || !account) {
-      toast.error("Connect a wallet to send this transaction.");
+      toast.error("Connect a wallet first.");
       return;
     }
     if (!chainMatch) {
@@ -385,7 +381,7 @@ export function MethodCard({
       return;
     }
     if (sim.status !== "success") {
-      toast.error("Simulate the call successfully before sending.");
+      toast.error("Simulate the call first.");
       return;
     }
 
@@ -419,20 +415,21 @@ export function MethodCard({
         status: rejected ? "rejected" : "failed",
         error: {
           message: rejected
-            ? "Signature request rejected in the wallet."
+            ? "You rejected the request in your wallet."
             : decoded.message,
           decodedName: decoded.decodedName,
           decodedArgs: decoded.decodedArgs,
         },
       });
-      toast.error(rejected ? "Transaction rejected." : decoded.message);
+      toast.error(rejected ? "Transaction rejected." : "Transaction failed.");
       setSending(false);
       return;
     }
 
     updateTx(tx.id, { status: "pending", hash });
     setSending(false);
-    toast.success("Transaction sent. Waiting for a receipt…");
+    // A sent transaction consumes the simulation; the next send needs a new one.
+    setSim({ status: "idle" });
 
     void (async () => {
       try {
@@ -458,13 +455,13 @@ export function MethodCard({
               }),
         });
         if (receipt.status === "success") {
-          toast.success("Transaction confirmed.");
+          toast.success(`${fn.name} confirmed.`);
         } else {
-          toast.error("Transaction reverted on-chain.");
+          toast.error(`${fn.name} reverted on-chain.`);
         }
       } catch {
         toast(
-          "The receipt is not available yet. Check the status from the history panel.",
+          "No receipt yet. Check its status later in the Transactions tab.",
           { icon: "⏳" },
         );
       }
@@ -472,18 +469,6 @@ export function MethodCard({
   };
 
   const requestSend = () => {
-    if (!isConnected || !account) {
-      toast.error("Connect a wallet to send this transaction.");
-      return;
-    }
-    if (!chainMatch) {
-      toast.error(`Switch your wallet to ${chainName(contract.chainId)} first.`);
-      return;
-    }
-    if (sim.status !== "success") {
-      toast.error("Simulate the call successfully before sending.");
-      return;
-    }
     if (payable && parsedValue.wei > threshold) {
       setConfirmOpen(true);
       return;
@@ -493,7 +478,7 @@ export function MethodCard({
 
   const copyArgs = async () => {
     if (!argsValid) {
-      toast.error("Fix the inputs before copying arguments.");
+      toast.error("Fill in the inputs first.");
       return;
     }
     try {
@@ -502,19 +487,6 @@ export function MethodCard({
     } catch {
       toast.error("Could not copy the arguments.");
     }
-  };
-
-  const openJson = () => {
-    setJsonOpen((value) => {
-      const next = !value;
-      if (next) {
-        setJsonText(
-          argsValid ? fieldsToArgsPreview(collected.args) : "",
-        );
-        setJsonError(null);
-      }
-      return next;
-    });
   };
 
   const applyJson = () => {
@@ -530,109 +502,67 @@ export function MethodCard({
       setErrors({});
       setJsonError(null);
       setSim({ status: "idle" });
-      toast.success("Arguments loaded.");
+      toast.success("Arguments filled in.");
     } catch (error) {
       setJsonError(errorMessage(error));
     }
   };
 
   const disabled = sim.status === "running" || sending;
-  const inputCount = fn.inputs.length;
+  const bodyId = `method-${mode}-${selector}`;
+
+  const writeBlocker = !isConnected
+    ? "Connect a wallet to simulate and send."
+    : !chainMatch
+      ? `Your wallet is on ${chainName(walletChainId)}. Switch to ${chainName(contract.chainId)}.`
+      : undefined;
 
   return (
-    <article className={cn("method-card", open && "is-open", mode)}>
+    <article className={cn("method", open && "is-open")}>
       <button
         type="button"
-        className="method-card-toggle"
+        className="method-toggle"
         aria-expanded={open}
-        aria-controls={`method-body-${signature}`}
+        aria-controls={bodyId}
         onClick={onToggle}
       >
         <ChevronRight
-          size={15}
-          className={cn("method-chevron", open && "rotate")}
+          size={14}
+          className={cn("chevron", open && "rotate")}
           aria-hidden="true"
         />
-        <span className="method-ident">
-          <span className="method-name mono">{fn.name}</span>
-          <span className="method-params mono">
+        <span className="method-ident mono">
+          <span className="method-name">{fn.name}</span>
+          <span className="method-params">
             (
             {fn.inputs
-              .map((input, index) => {
-                const label = formatInputLabel(input, index);
+              .map((input) => {
                 const type = canonicalParameterType(input);
-                return input.name ? `${type} ${label}` : type;
+                return input.name ? `${type} ${input.name}` : type;
               })
               .join(", ")}
             )
           </span>
         </span>
-        <span className="method-meta">
-          <Badge tone={mode === "read" ? "blue" : "amber"}>
-            {fn.stateMutability === "pure"
-              ? "PURE"
-              : fn.stateMutability === "view"
-                ? "VIEW"
-                : payable
-                  ? "PAYABLE"
-                  : "WRITE"}
-          </Badge>
-          {inputCount > 0 && (
-            <span className="method-arg-count">
-              {inputCount} arg{inputCount === 1 ? "" : "s"}
-            </span>
-          )}
-          <span className="method-selector mono">{selector}</span>
-          <span className="method-output mono">
-            → {outputSummary(fn)}
+        {payable && <span className="tag tag-amber">payable</span>}
+        {preview && (
+          <span className="method-preview mono">
+            {preview.status === "loading" ? (
+              <span className="muted">…</span>
+            ) : preview.status === "error" ? (
+              <span className="muted">error</span>
+            ) : (
+              previewValue(preview.value)
+            )}
           </span>
+        )}
+        <span className="method-selector mono" title="Function selector">
+          {selector}
         </span>
       </button>
 
       {open && (
-        <div
-          className="method-body"
-          id={`method-body-${signature}`}
-          aria-live="polite"
-        >
-          {mode === "write" && (
-            <>
-              {!isConnected && (
-                <div className="notice info">
-                  <Wallet size={16} />
-                  <div>
-                    <strong>Wallet not connected</strong>
-                    <p>
-                      Reads are open to everyone. Connect a wallet on{" "}
-                      {chainName(contract.chainId)} to simulate and send this
-                      write.
-                    </p>
-                  </div>
-                </div>
-              )}
-              {isConnected && !chainMatch && (
-                <div className="notice warning">
-                  <ShieldAlert size={16} />
-                  <div>
-                    <strong>Wrong network</strong>
-                    <p>
-                      Your wallet is on {chainName(walletChainId)}. This contract
-                      is on {chainName(contract.chainId)}. Switch networks before
-                      simulating.
-                    </p>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-
-          <div className="method-signature-line">
-            <code className="mono">{signature}</code>
-            <CopyButton value={signature} label="Copy signature" compact />
-            <span className="selector-chip mono">{selector}</span>
-            <CopyButton value={selector} label="Copy selector" compact />
-          </div>
-
+        <div className="method-body" id={bodyId}>
           <ArgsForm
             inputs={fn.inputs}
             fields={fields}
@@ -641,199 +571,209 @@ export function MethodCard({
             disabled={disabled}
           />
 
-          <div className="method-tools">
-            <button type="button" className="text-link" onClick={openJson}>
-              <ClipboardPaste size={13} />
-              {jsonOpen ? "Hide JSON arguments" : "Paste JSON arguments"}
-            </button>
-            <button
-              type="button"
-              className="text-link"
-              onClick={() => void copyArgs()}
-            >
-              <Copy size={13} /> Copy arguments
-            </button>
-            <button
-              type="button"
-              className="text-link"
-              onClick={resetValues}
-            >
-              <RotateCcw size={13} /> Reset values
-            </button>
-          </div>
-
-          {jsonOpen && (
-            <div className="json-args">
-              <label className="field-label" htmlFor={`json-${signature}`}>
-                Arguments as a JSON array
-              </label>
-              <textarea
-                id={`json-${signature}`}
-                className={cn("field mono textarea compact", jsonError && "invalid")}
-                value={jsonText}
-                onChange={(event) => setJsonText(event.target.value)}
-                placeholder="[1, &quot;0x…&quot;, true]"
-                spellCheck={false}
-              />
-              {jsonError && <p className="field-error">{jsonError}</p>}
-              <div className="json-args-actions">
-                <Button size="sm" variant="secondary" onClick={applyJson}>
-                  Apply JSON
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    try {
-                      setJsonText(
-                        toJson(JSON.parse(jsonText), 2),
-                      );
-                      setJsonError(null);
-                    } catch {
-                      setJsonError("That is not valid JSON.");
-                    }
-                  }}
-                >
-                  Format
-                </Button>
-              </div>
-            </div>
-          )}
-
           {payable && (
-            <div className="value-field">
-              <div className="value-field-labels">
-                <label className="field-label" htmlFor={`value-${signature}`}>
-                  Native value
-                </label>
-                <span className="hint">
-                  Balance:{" "}
-                  {balance.data
-                    ? `${balance.data.formatted} ${balance.data.symbol}`
-                    : account
-                      ? "loading…"
-                      : "not connected"}
-                </span>
-              </div>
-              <div className="value-input-row">
+            <div className="arg-field">
+              <label className="arg-label" htmlFor={`${bodyId}-value`}>
+                Value to send
+                <em className="mono">{valueUnit === "native" ? nativeSymbol : "wei"}</em>
+              </label>
+              <div className="inline-field">
                 <input
-                  id={`value-${signature}`}
+                  id={`${bodyId}-value`}
                   className={cn("field mono", parsedValue.error && "invalid")}
                   value={valueInput}
                   onChange={(event) => {
                     setValueInput(event.target.value);
                     setSim({ status: "idle" });
                   }}
-                  placeholder="0.0"
+                  placeholder="0"
                   inputMode="decimal"
                   spellCheck={false}
                   disabled={disabled}
                 />
-                <div className="unit-toggle" role="group" aria-label="Value unit">
-                  <button
-                    type="button"
-                    className={valueUnit === "native" ? "selected" : ""}
-                    aria-pressed={valueUnit === "native"}
-                    onClick={() => {
-                      setValueUnit("native");
-                      setSim({ status: "idle" });
-                    }}
-                  >
-                    {nativeSymbol}
-                  </button>
-                  <button
-                    type="button"
-                    className={valueUnit === "wei" ? "selected" : ""}
-                    aria-pressed={valueUnit === "wei"}
-                    onClick={() => {
-                      setValueUnit("wei");
-                      setSim({ status: "idle" });
-                    }}
-                  >
-                    wei
-                  </button>
+                <div className="segmented small" role="group" aria-label="Value unit">
+                  {(["native", "wei"] as const).map((unit) => (
+                    <button
+                      key={unit}
+                      type="button"
+                      className={valueUnit === unit ? "selected" : ""}
+                      aria-pressed={valueUnit === unit}
+                      onClick={() => {
+                        setValueUnit(unit);
+                        setSim({ status: "idle" });
+                      }}
+                    >
+                      {unit === "native" ? nativeSymbol : "wei"}
+                    </button>
+                  ))}
                 </div>
               </div>
               {parsedValue.error ? (
                 <p className="field-error">{parsedValue.error}</p>
+              ) : insufficientBalance ? (
+                <p className="field-error">More than your wallet balance.</p>
               ) : (
-                <p className="hint mono">
-                  = {parsedValue.wei.toString()} wei
-                </p>
-              )}
-              {insufficientBalance && (
-                <p className="field-error">
-                  Value exceeds the connected wallet balance.
-                </p>
+                account && (
+                  <p className="hint">
+                    Balance:{" "}
+                    {balance.data !== undefined
+                      ? formatNativeValue(balance.data, nativeSymbol)
+                      : "…"}
+                  </p>
+                )
               )}
             </div>
           )}
 
           {encoded.error && argsValid && (
-            <div className="issue-box" role="alert">
-              <span className="issue-icon">
-                <TriangleAlert size={16} />
-              </span>
-              <div>
-                <strong>Could not encode the call</strong>
-                <p>{encoded.error}</p>
-              </div>
-            </div>
+            <p className="status-line danger" role="alert">
+              <TriangleAlert size={14} /> Could not encode the call:{" "}
+              {encoded.error}
+            </p>
           )}
 
-          <div className="calldata-preview">
-            <div className="calldata-heading">
-              <span className="eyebrow">
-                <Code2 size={12} /> CALLDATA
-              </span>
-              <span className="calldata-flags mono">
-                {chainName(contract.chainId)} · {contract.address.slice(0, 6)}…
-                {contract.address.slice(-4)}
-                {payable && parsedValue.wei > 0n
-                  ? ` · ${formatNativeValue(parsedValue.wei, nativeSymbol)}`
-                  : ""}
-              </span>
-              {encoded.data && (
-                <CopyButton
-                  value={encoded.data}
-                  label="Copy calldata"
-                  compact
-                />
-              )}
+          {mode === "read" ? (
+            <div className="method-actions">
+              <Button
+                variant="primary"
+                loading={readQuery.isFetching}
+                disabled={!argsValid || readQuery.isFetching}
+                onClick={queryRead}
+              >
+                {readRequest ? "Query again" : "Query"}
+              </Button>
             </div>
-            {encoded.data ? (
-              <code className="calldata-value mono">{encoded.data}</code>
-            ) : (
-              <p className="hint">
-                Fill every input to generate calldata.
-              </p>
+          ) : (
+            <>
+              {writeBlocker && (
+                <p className="status-line muted">
+                  <Info size={14} /> {writeBlocker}
+                </p>
+              )}
+              <div className="method-actions">
+                <Button
+                  variant={sim.status === "success" ? "secondary" : "primary"}
+                  loading={sim.status === "running"}
+                  disabled={
+                    disabled ||
+                    !argsValid ||
+                    Boolean(writeBlocker) ||
+                    Boolean(parsedValue.error) ||
+                    insufficientBalance
+                  }
+                  onClick={() => void simulateWrite()}
+                >
+                  {sim.status === "success" ? "Simulate again" : "Simulate"}
+                </Button>
+                <Button
+                  variant="primary"
+                  loading={sending}
+                  disabled={
+                    sim.status !== "success" ||
+                    sending ||
+                    Boolean(writeBlocker) ||
+                    txInFlight
+                  }
+                  onClick={requestSend}
+                  title={
+                    sim.status !== "success"
+                      ? "Run a successful simulation first"
+                      : undefined
+                  }
+                >
+                  {sending ? "Confirm in wallet…" : "Send transaction"}
+                </Button>
+                {sim.status === "running" && (
+                  <span className="hint">
+                    <Loader2 size={13} className="spin" /> Simulating…
+                  </span>
+                )}
+              </div>
+            </>
+          )}
+
+          <div aria-live="polite">
+            {mode === "read" && (
+              <>
+                {argsDirty && readRequest && (
+                  <p className="hint">
+                    Inputs changed since this result. Query again to update it.
+                  </p>
+                )}
+                {readQuery.isSuccess && readRequest && (
+                  <ResultView
+                    outputs={fn.outputs ?? []}
+                    value={readQuery.data}
+                    label={
+                      readRequest.block !== undefined
+                        ? `Result at block ${readRequest.block.toString()}`
+                        : "Result"
+                    }
+                  />
+                )}
+                {readError && (
+                  <p className="status-line danger" role="alert">
+                    <TriangleAlert size={14} /> {readError.message}
+                  </p>
+                )}
+              </>
+            )}
+
+            {mode === "write" && sim.status === "error" && (
+              <div className="callout danger" role="alert">
+                <strong>
+                  Simulation reverted
+                  {sim.decodedName ? `: ${sim.decodedName}` : ""}
+                </strong>
+                <p className="mono">{sim.message}</p>
+              </div>
+            )}
+
+            {mode === "write" && sim.status === "success" && (
+              <div className="callout success">
+                <strong>
+                  <Check size={14} /> Simulation passed
+                  {sim.gas ? ` · ~${sim.gas.toLocaleString()} gas` : ""}
+                </strong>
+                <p>
+                  The call would not revert right now. That doesn’t guarantee it
+                  will succeed on-chain.
+                </p>
+                {sim.result !== undefined && (
+                  <pre className="mono">Returns: {toJson(sim.result)}</pre>
+                )}
+              </div>
+            )}
+
+            {mode === "write" && activeTx && (
+              <TransactionProgress tx={activeTx} chainId={contract.chainId} />
             )}
           </div>
 
-          {mode === "read" ? (
-            <>
-              <div className="method-actions">
-                <Button
-                  variant="primary"
-                  icon={<Play size={15} />}
-                  loading={readQuery.isFetching}
-                  disabled={!argsValid || readQuery.isFetching}
-                  onClick={queryRead}
-                >
-                  Query
-                </Button>
-                {readRequest && (
-                  <Button
-                    variant="ghost"
-                    icon={<RefreshCw size={14} />}
-                    loading={readQuery.isFetching}
-                    onClick={() => setNonce((value) => value + 1)}
-                  >
-                    Refresh
-                  </Button>
-                )}
-                <label className="block-field">
-                  <span>Block</span>
+          <div className="calldata">
+            <span className="calldata-label">Calldata</span>
+            {encoded.data ? (
+              <>
+                <code className="mono">{encoded.data}</code>
+                <CopyButton value={encoded.data} label="Copy calldata" compact />
+              </>
+            ) : (
+              <span className="muted">Fill in every input to see calldata.</span>
+            )}
+          </div>
+
+          <details className="advanced">
+            <summary>More options</summary>
+            <div className="advanced-body">
+              <div className="advanced-row">
+                <span className="advanced-label">Signature</span>
+                <code className="mono">{signature}</code>
+                <CopyButton value={signature} label="Copy signature" compact />
+              </div>
+
+              {mode === "read" && (
+                <label className="advanced-row">
+                  <span className="advanced-label">Block</span>
                   <input
                     className={cn("field mono compact", blockError && "invalid")}
                     value={blockInput}
@@ -843,162 +783,55 @@ export function MethodCard({
                     spellCheck={false}
                   />
                 </label>
-              </div>
+              )}
               {blockError && <p className="field-error">{blockError}</p>}
 
-              {argsDirty && readRequest && (
-                <p className="hint stale-hint">
-                  <Info size={13} /> Inputs changed since this result. Run the
-                  query again to refresh.
-                </p>
-              )}
-
-              {readQuery.isSuccess && readRequest && (
-                <ResultView
-                  outputs={fn.outputs ?? []}
-                  value={readQuery.data}
-                  label={`Result · block ${readRequest.block?.toString() ?? "latest"}`}
-                />
-              )}
-
-              {readError && (
-                <div className="tx-note danger" role="alert">
-                  <TriangleAlert size={14} /> {readError.message}
+              {fn.inputs.length > 0 && (
+                <div className="json-args">
+                  <label className="advanced-label" htmlFor={`${bodyId}-json`}>
+                    Fill inputs from a JSON array
+                  </label>
+                  <textarea
+                    id={`${bodyId}-json`}
+                    className={cn("field mono textarea compact", jsonError && "invalid")}
+                    value={jsonText}
+                    onChange={(event) => setJsonText(event.target.value)}
+                    placeholder={`[${fn.inputs
+                      .map((input, index) => formatInputLabel(input, index))
+                      .join(", ")}]`}
+                    spellCheck={false}
+                  />
+                  {jsonError && <p className="field-error">{jsonError}</p>}
+                  <div className="button-row">
+                    <Button size="sm" onClick={applyJson} disabled={!jsonText.trim()}>
+                      Apply
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => void copyArgs()}>
+                      Copy current inputs as JSON
+                    </Button>
+                  </div>
                 </div>
               )}
-            </>
-          ) : (
-            <>
-              <div className="method-actions">
+
+              <div className="button-row">
                 <Button
-                  variant="secondary"
-                  icon={<FlaskConical size={15} />}
-                  loading={sim.status === "running"}
-                  disabled={
-                    disabled ||
-                    !argsValid ||
-                    !isConnected ||
-                    !chainMatch ||
-                    Boolean(parsedValue.error) ||
-                    insufficientBalance
-                  }
-                  onClick={() => void simulateWrite()}
+                  size="sm"
+                  variant="ghost"
+                  icon={<RotateCcw size={13} />}
+                  onClick={resetValues}
                 >
-                  Simulate
+                  Clear inputs and result
                 </Button>
-                <Button
-                  variant="primary"
-                  icon={<Send size={15} />}
-                  loading={sending}
-                  disabled={
-                    sim.status !== "success" ||
-                    sending ||
-                    !isConnected ||
-                    !chainMatch ||
-                    txInFlight
-                  }
-                  onClick={requestSend}
-                  title={
-                    sim.status !== "success"
-                      ? "A successful simulation is required first"
-                      : undefined
-                  }
-                >
-                  {sending ? "Waiting for wallet…" : "Send transaction"}
-                </Button>
-                {sim.status === "success" && (
-                  <Button
-                    variant="ghost"
-                    icon={<RotateCcw size={13} />}
-                    size="sm"
-                    onClick={() => {
-                      setSim({ status: "idle" });
-                      setActiveTxId(null);
-                    }}
-                  >
-                    Simulate again
-                  </Button>
-                )}
               </div>
-
-              {!isConnected && (
-                <p className="hint">
-                  <KeyRound size={13} /> Connect a wallet on{" "}
-                  {chainName(contract.chainId)} to simulate.
-                </p>
-              )}
-
-              {sim.status === "running" && (
-                <p className="hint">
-                  <Loader2 size={13} className="spin" /> Running eth_call
-                  simulation…
-                </p>
-              )}
-
-              {sim.status === "error" && (
-                <div className="sim-result error" role="alert">
-                  <span className="sim-icon">
-                    <TriangleAlert size={16} />
-                  </span>
-                  <div>
-                    <strong>
-                      Simulation reverted
-                      {sim.decodedName ? ` · ${sim.decodedName}` : ""}
-                    </strong>
-                    <p className="mono">{sim.message}</p>
-                  </div>
-                </div>
-              )}
-
-              {sim.status === "success" && (
-                <div className="sim-result success">
-                  <span className="sim-icon">
-                    <Check size={16} />
-                  </span>
-                  <div>
-                    <strong>Simulation succeeded</strong>
-                    <p>
-                      The call did not revert
-                      {sim.gas ? ` · estimated gas ${sim.gas.toLocaleString()}` : ""}
-                      . This is not a safety guarantee.
-                    </p>
-                    {sim.result !== undefined && (
-                      <pre className="sim-return mono">
-                        {toJson(sim.result)}
-                      </pre>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {activeTx && (
-                <TransactionProgress
-                  tx={activeTx}
-                  signing={sending}
-                  chainId={contract.chainId}
-                />
-              )}
-            </>
-          )}
-
-          <div className="method-footnote">
-            <span>
-              <ChainBadge chainId={contract.chainId} />
-              <span className="mono">{selector}</span>
-            </span>
-            <span className="hint">
-              {mode === "read"
-                ? "Read calls never require a signature."
-                : "Simulation uses your connected account. Writes are never auto-retried."}
-            </span>
-          </div>
+            </div>
+          </details>
         </div>
       )}
 
       <ConfirmDialog
         open={confirmOpen}
-        title="Confirm native value"
-        description={`You are about to send ${formatNativeValue(parsedValue.wei, nativeSymbol)} to ${contract.address} on ${chainName(contract.chainId)}. Calls above your configured threshold require an explicit confirmation.`}
+        title={`Send ${formatNativeValue(parsedValue.wei, nativeSymbol)}?`}
+        description={`This calls ${fn.name} on ${contract.address} (${chainName(contract.chainId)}) and sends ${formatNativeValue(parsedValue.wei, nativeSymbol)} with it. You can change when this check appears in Settings.`}
         confirmLabel="Continue to wallet"
         tone="primary"
         onCancel={() => setConfirmOpen(false)}

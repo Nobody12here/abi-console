@@ -1,10 +1,42 @@
 import { useEffect, useRef, useState } from "react";
-import { NavLink, Link, useLocation } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { Menu, Moon, Settings2, Sun, X } from "lucide-react";
+import { Menu, Moon, Sun, X } from "lucide-react";
 import { Brand } from "./Brand";
 import { useWorkspace } from "@/features/workspace/WorkspaceProvider";
 import { cn } from "@/lib/utils";
+
+const NAV = [
+  { to: "/", label: "Contracts", end: true },
+  { to: "/import", label: "Add contract", end: false },
+  { to: "/settings", label: "Settings", end: false },
+];
+
+function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
+  const { pathname } = useLocation();
+  return (
+    <>
+      {NAV.map((item) => (
+        <NavLink
+          key={item.to}
+          to={item.to}
+          end={item.end}
+          onClick={onNavigate}
+          className={({ isActive }) =>
+            cn(
+              "nav-link",
+              // Contract pages belong to the Contracts section.
+              (isActive || (item.to === "/" && pathname.startsWith("/contract/"))) &&
+                "active",
+            )
+          }
+        >
+          {item.label}
+        </NavLink>
+      ))}
+    </>
+  );
+}
 
 export function AppHeader() {
   const { resolvedTheme, updateSettings } = useWorkspace();
@@ -12,9 +44,9 @@ export function AppHeader() {
   // Storing the path the menu was opened on closes it automatically on navigation.
   const [menuPath, setMenuPath] = useState<string | null>(null);
   const menuOpen = menuPath === pathname;
-  const closeMenu = () => setMenuPath(null);
   const headerRef = useRef<HTMLElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const nextTheme = resolvedTheme === "dark" ? "light" : "dark";
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -47,48 +79,22 @@ export function AppHeader() {
         <Brand />
 
         <nav className="main-nav" aria-label="Primary">
-          <NavLink
-            to="/"
-            end
-            className={({ isActive }) => cn("nav-link", isActive && "active")}
-          >
-            Contracts
-          </NavLink>
-          <NavLink
-            to="/settings"
-            className={({ isActive }) => cn("nav-link", isActive && "active")}
-          >
-            Settings
-          </NavLink>
+          <NavLinks />
         </nav>
 
         <div className="topbar-actions">
-          <Link to="/import" className="btn btn-primary btn-sm topbar-import">
-            Import contract
-          </Link>
-          <Link
-            to="/settings"
-            className="icon-btn settings-shortcut"
-            aria-label="Settings"
-            title="Settings"
-          >
-            <Settings2 size={16} />
-          </Link>
           <button
             type="button"
             className="icon-btn"
-            aria-label={`Switch to ${resolvedTheme === "dark" ? "light" : "dark"} theme`}
-            title={`Switch to ${resolvedTheme === "dark" ? "light" : "dark"} theme`}
-            onClick={() =>
-              updateSettings({
-                theme: resolvedTheme === "dark" ? "light" : "dark",
-              })
-            }
+            aria-label={`Switch to ${nextTheme} theme`}
+            title={`Switch to ${nextTheme} theme`}
+            onClick={() => updateSettings({ theme: nextTheme })}
           >
             {resolvedTheme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
           </button>
           <div className="wallet-wrap">
             <ConnectButton
+              label="Connect wallet"
               chainStatus="icon"
               accountStatus="address"
               showBalance={false}
@@ -110,32 +116,11 @@ export function AppHeader() {
 
       <nav
         id="mobile-nav"
-        className={cn("mobile-nav", menuOpen && "is-open")}
+        className="mobile-nav"
         aria-label="Primary mobile"
         hidden={!menuOpen}
       >
-        <NavLink
-          to="/"
-          end
-          className={({ isActive }) => cn("nav-link", isActive && "active")}
-          onClick={closeMenu}
-        >
-          Contracts
-        </NavLink>
-        <NavLink
-          to="/import"
-          className={({ isActive }) => cn("nav-link", isActive && "active")}
-          onClick={closeMenu}
-        >
-          Import contract
-        </NavLink>
-        <NavLink
-          to="/settings"
-          className={({ isActive }) => cn("nav-link", isActive && "active")}
-          onClick={closeMenu}
-        >
-          Settings
-        </NavLink>
+        <NavLinks onNavigate={() => setMenuPath(null)} />
       </nav>
     </header>
   );

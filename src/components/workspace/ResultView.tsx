@@ -1,30 +1,25 @@
 import type { AbiParameter } from "viem";
-import { Braces, Copy } from "lucide-react";
-import toast from "react-hot-toast";
-import { copyText, toJson } from "@/lib/format";
-import { formatInputLabel } from "@/features/abi/utils";
+import { toJson } from "@/lib/format";
 import { CopyButton } from "@/components/ui/CopyButton";
 
 export function ValueView({ value }: { value: unknown }) {
   if (value === null || value === undefined) {
     return <span className="muted">null</span>;
   }
-  if (typeof value === "boolean") {
+  if (typeof value === "boolean" || typeof value === "bigint" || typeof value === "number") {
     return <span className="mono">{String(value)}</span>;
-  }
-  if (typeof value === "bigint") {
-    return <span className="mono">{value.toString()}</span>;
   }
   if (typeof value === "string") {
     if (value.length === 0) return <span className="muted">""</span>;
-    return <span className="mono result-string">{value}</span>;
+    return <span className="mono break">{value}</span>;
   }
   if (Array.isArray(value)) {
+    if (value.length === 0) return <span className="muted">[]</span>;
     return (
       <ol className="result-array">
         {value.map((entry, index) => (
           <li key={index}>
-            <span className="result-index mono">[{index}]</span>
+            <span className="result-index mono">{index}</span>
             <ValueView value={entry} />
           </li>
         ))}
@@ -64,58 +59,38 @@ export function ResultView({
   const values = isMulti && Array.isArray(value) ? value : [value];
 
   return (
-    <div className="result-box">
+    <div className="result">
       <div className="result-heading">
-        <span className="eyebrow">
-          <Braces size={12} /> {label}
-        </span>
-        <div className="result-heading-actions">
-          <button
-            type="button"
-            className="copy-btn compact"
-            aria-label="Copy result as JSON"
-            title="Copy result as JSON"
-            onClick={async () => {
-              try {
-                await copyText(toJson(value));
-                toast.success("Result copied.");
-              } catch {
-                toast.error("Could not copy the result.");
-              }
-            }}
-          >
-            <Copy size={12} />
-          </button>
-          <span className="mono result-shape">
-            {isMulti ? `${outputs.length} values` : "1 value"}
-          </span>
-        </div>
+        <span>{label}</span>
+        {outputs.length > 0 && (
+          <CopyButton value={toJson(value)} label="Copy as JSON" />
+        )}
       </div>
 
       {outputs.length === 0 ? (
-        <p className="empty-inline">This method returns no values.</p>
+        <p className="muted">This function returns nothing.</p>
       ) : (
         <div className="result-rows">
-          {outputs.map((output, index) => (
-            <div className="result-row" key={index}>
-              <span className="result-label">
-                {formatInputLabel(output, index)}
-                <em className="mono">{output.type}</em>
-              </span>
-              <div className="result-value">
-                <ValueView value={values[index]} />
-                <CopyButton
-                  value={
-                    typeof values[index] === "string"
-                      ? values[index]
-                      : toJson(values[index])
-                  }
-                  label="Copy value"
-                  compact
-                />
+          {outputs.map((output, index) => {
+            const entry = values[index];
+            return (
+              <div className="result-row" key={index}>
+                <span className="result-label">
+                  {output.name?.trim() ||
+                    (outputs.length === 1 ? "Returns" : `Return ${index}`)}
+                  <em className="mono">{output.type}</em>
+                </span>
+                <div className="result-value">
+                  <ValueView value={entry} />
+                  <CopyButton
+                    value={typeof entry === "string" ? entry : toJson(entry)}
+                    label="Copy value"
+                    compact
+                  />
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

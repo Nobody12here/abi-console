@@ -1,5 +1,4 @@
 import { useEffect, useId, useRef } from "react";
-import { AlertTriangle, X } from "lucide-react";
 import { Button } from "./Button";
 
 const FOCUSABLE = [
@@ -99,19 +98,6 @@ export function ConfirmDialog({
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
       >
-        <div className="dialog-heading">
-          <span className={tone === "danger" ? "dialog-icon danger" : "dialog-icon"}>
-            <AlertTriangle size={18} />
-          </span>
-          <button
-            type="button"
-            className="icon-btn"
-            aria-label="Close dialog"
-            onClick={onCancel}
-          >
-            <X size={15} />
-          </button>
-        </div>
         <h2 id={titleId}>{title}</h2>
         {description && <p id={descriptionId}>{description}</p>}
         <div className="dialog-actions">

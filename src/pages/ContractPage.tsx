@@ -3,13 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { isAddress, type Address } from "viem";
 import toast from "react-hot-toast";
-import {
-  AlertTriangle,
-  ArrowLeft,
-  Braces,
-  FileWarning,
-  Plus,
-} from "lucide-react";
+import { TriangleAlert } from "lucide-react";
 import type { AbiRevision, ContractBinding } from "@/features/abi/types";
 import { useWorkspace } from "@/features/workspace/WorkspaceProvider";
 import {
@@ -19,74 +13,63 @@ import {
 import { bindingId } from "@/features/storage/workspace";
 import { createReadClient } from "@/lib/rpc";
 import { inspectContract } from "@/lib/proxy";
-import { chainName } from "@/lib/chains";
-import { Spinner } from "@/components/ui/Spinner";
+import { chainName, getChain } from "@/lib/chains";
+import { PageLoading } from "@/components/ui/PageLoading";
+import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ContractHeader } from "@/components/workspace/ContractHeader";
 import { ChainBanner } from "@/components/workspace/ChainBanner";
-import {
-  ContractTabs,
-  type ContractTab,
-} from "@/components/workspace/ContractTabs";
-import { OverviewPanel } from "@/components/workspace/OverviewPanel";
+import { ContractTabs } from "@/components/workspace/ContractTabs";
+import { CONTRACT_TABS, type ContractTab } from "@/components/workspace/tabs";
+import { DetailsPanel } from "@/components/workspace/DetailsPanel";
 import { MethodList } from "@/components/workspace/MethodList";
 import { TransactionsPanel } from "@/components/workspace/TransactionsPanel";
 import { EventsPanel } from "@/components/workspace/EventsPanel";
 import { AbiPanel } from "@/components/workspace/AbiPanel";
 
-const TABS: ContractTab[] = [
-  "overview",
-  "read",
-  "write",
-  "events",
-  "transactions",
-  "abi",
-];
+function resolveTab(param: string | undefined): ContractTab {
+  // "overview" was the old name of the details tab; keep old links working.
+  if (param === "overview") return "details";
+  return CONTRACT_TABS.some((tab) => tab.id === param)
+    ? (param as ContractTab)
+    : "read";
+}
 
 function MissingContract({
   chainId,
   address,
 }: {
-  chainId: number | undefined;
+  chainId: number;
   address: string | undefined;
 }) {
-  const valid = typeof chainId === "number" && Number.isFinite(chainId) && address !== undefined && isAddress(address);
-  const prefill = valid
-    ? `/import?chainId=${chainId}&address=${address}`
-    : "/import";
+  const valid =
+    getChain(chainId) !== undefined && address !== undefined && isAddress(address);
 
   return (
-    <div className="page contract-page">
+    <div className="page">
       <EmptyState
-        icon={<FileWarning size={24} />}
-        eyebrow="NOT IN THIS WORKSPACE"
-        title="This contract is not stored in this browser"
+        title={valid ? "This contract isn’t saved here" : "Invalid contract link"}
         description={
           valid ? (
-            <>
-              There is no local binding for{" "}
-              <code className="mono">{address}</code> on{" "}
-              <strong>{chainName(chainId)}</strong>. Import an ABI to open the
-              read and write surface. Nothing is fetched from an explorer unless
-              you explicitly choose that source.
-            </>
+            <p>
+              <code className="mono break">{address}</code> on{" "}
+              {chainName(chainId)} isn’t saved in this browser. Add it with its
+              ABI to use it.
+            </p>
           ) : (
-            <>
-              The address or chain in this link is not valid. Check the URL, or
-              start from the import screen and bind a contract manually.
-            </>
+            <p>The network or address in this link isn’t valid.</p>
           )
         }
         action={
-          <div className="empty-state-actions">
+          <div className="button-row">
             <Link
-              to={prefill}
+              to={valid ? `/import?chainId=${chainId}&address=${address}` : "/import"}
               className="btn btn-primary"
             >
-              <Plus size={15} /> Import this contract
+              Add this contract
             </Link>
             <Link to="/" className="btn btn-ghost">
-              <ArrowLeft size={15} /> Back to contracts
+              Back to contracts
             </Link>
           </div>
         }
@@ -158,13 +141,13 @@ export function ContractPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [binding?.id, codeQuery.dataUpdatedAt]);
 
+  const contractTxs = useMemo(
+    () => (binding ? txs.filter((tx) => tx.contractId === binding.id) : []),
+    [txs, binding],
+  );
+
   if (!ready) {
-    return (
-      <div className="page-loading">
-        <Spinner label="Loading contract" />
-        <span>Loading local workspace…</span>
-      </div>
-    );
+    return <PageLoading />;
   }
 
   if (!binding) {
@@ -173,18 +156,16 @@ export function ContractPage() {
 
   if (!revision) {
     return (
-      <div className="page contract-page">
+      <div className="page">
         <EmptyState
-          icon={<Braces size={24} />}
-          eyebrow="MISSING ABI"
-          title="This binding has no active ABI revision"
-          description="The local record exists, but its ABI document is missing or was corrupted. Re-import the ABI to restore the workspace. The address and local transaction history are kept."
+          title="This contract has no ABI"
+          description="Its saved ABI is missing or damaged. Add the ABI again; the address and transaction history are kept."
           action={
             <Link
               to={`/import?chainId=${binding.chainId}&address=${binding.address}`}
               className="btn btn-primary"
             >
-              <Plus size={15} /> Re-import ABI
+              Add ABI
             </Link>
           }
         />
@@ -192,17 +173,48 @@ export function ContractPage() {
     );
   }
 
-  const tabParam = params.tab ?? "overview";
-  const tab: ContractTab = TABS.includes(tabParam as ContractTab)
-    ? (tabParam as ContractTab)
-    : "overview";
+  const tab = resolveTab(params.tab);
   const basePath = `/contract/${binding.chainId}/${binding.address}`;
-  const contractTxs = txs.filter((tx) => tx.contractId === binding.id);
+  const codeInfo = codeQuery.data;
+  const codeMissing = codeInfo?.codeSize === 0;
+  const codeChanged =
+    Boolean(binding.codeInfo && codeInfo) &&
+    binding.codeInfo?.codeHash !== codeInfo?.codeHash &&
+    !codeMissing;
 
   return (
     <div className="page contract-page">
-      <ContractHeader binding={binding} revision={revision} />
+      <ContractHeader binding={binding} />
       <ChainBanner contractChainId={binding.chainId} />
+
+      {codeMissing && (
+        <div className="notice danger">
+          <TriangleAlert size={16} />
+          <div>
+            <strong>No contract code at this address.</strong> It may have been
+            destroyed, or it was saved on the wrong network.
+          </div>
+        </div>
+      )}
+      {codeChanged && (
+        <div className="notice warning">
+          <TriangleAlert size={16} />
+          <div>
+            <strong>The deployed code changed since you saved this contract.</strong>{" "}
+            The ABI may be out of date.
+          </div>
+          <Button
+            size="sm"
+            onClick={() => {
+              updateBinding(binding.id, { codeInfo });
+              toast.success("Marked the new code as expected.");
+            }}
+          >
+            Dismiss
+          </Button>
+        </div>
+      )}
+
       <ContractTabs
         basePath={basePath}
         active={tab}
@@ -210,32 +222,10 @@ export function ContractPage() {
         txCount={contractTxs.length}
       />
 
-      <div className="workspace-body">
-        {tab === "overview" && (
-          <OverviewPanel
-            binding={binding}
-            revision={revision}
-            revisions={bindingRevisions}
-            txs={contractTxs}
-            codeInfo={codeQuery.data}
-            codeLoading={codeQuery.isFetching}
-            codeError={codeQuery.error}
-            onRecheck={() => {
-              void codeQuery.refetch();
-            }}
-            onUpdateSnapshot={() => {
-              if (!codeQuery.data) {
-                toast.error("Re-check the deployed code first.");
-                return;
-              }
-              updateBinding(binding.id, { codeInfo: codeQuery.data });
-              toast.success("Code snapshot updated.");
-            }}
-          />
-        )}
-
+      <div className="tab-panel" key={binding.id}>
         {tab === "read" && (
           <MethodList
+            key="read"
             contract={binding}
             revision={revision}
             functions={abiReadFunctions(revision.abi)}
@@ -245,6 +235,7 @@ export function ContractPage() {
 
         {tab === "write" && (
           <MethodList
+            key="write"
             contract={binding}
             revision={revision}
             functions={abiWriteFunctions(revision.abi)}
@@ -268,14 +259,20 @@ export function ContractPage() {
             revisions={bindingRevisions}
           />
         )}
-      </div>
 
-      <div className="workspace-footnote">
-        <AlertTriangle size={13} />
-        <span>
-          The ABI hash proves what you imported, not that it matches the
-          deployed bytecode. Always review calldata and simulate before signing.
-        </span>
+        {tab === "details" && (
+          <DetailsPanel
+            binding={binding}
+            revision={revision}
+            revisions={bindingRevisions}
+            codeInfo={codeInfo}
+            codeLoading={codeQuery.isFetching}
+            codeError={codeQuery.error}
+            onRecheck={() => {
+              void codeQuery.refetch();
+            }}
+          />
+        )}
       </div>
     </div>
   );

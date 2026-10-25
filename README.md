@@ -55,15 +55,15 @@ Custom chain creation is intentionally deferred because it requires rebuilding t
 
 ```
 src/
-  App.tsx                    route shell, toaster, footer
+  App.tsx                    route shell, toaster
   main.tsx                   providers: wagmi → query → workspace → RainbowKit → router
   pages/                     Home, Import, Contract, Settings, NotFound
   components/
     layout/                  top bar, brand, page header, error boundary
-    ui/                      Button, Badge, ChainBadge, CopyButton, Dialog, Spinner, EmptyState
+    ui/                      Button, ChainBadge, CopyButton, Dialog, Spinner, EmptyState
     contracts/               contract row
-    workspace/               contract header/tabs, overview, method list + card,
-                             argument form, result view, transactions, events, ABI panel
+    workspace/               contract header/tabs, method list + card, argument form,
+                             result view, transactions, events, ABI and details panels
   features/
     abi/                     types, source metadata, normalization + hashing, selectors
     execution/               recursive argument trees, error decoding

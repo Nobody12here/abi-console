@@ -1,24 +1,8 @@
 import { useEffect, useRef } from "react";
-import { NavLink } from "react-router-dom";
+import { Link } from "react-router-dom";
 import type { AbiCounts } from "@/features/abi/types";
 import { cn } from "@/lib/utils";
-
-export type ContractTab =
-  | "overview"
-  | "read"
-  | "write"
-  | "events"
-  | "transactions"
-  | "abi";
-
-const TABS: Array<{ id: ContractTab; label: string }> = [
-  { id: "overview", label: "Overview" },
-  { id: "read", label: "Read" },
-  { id: "write", label: "Write" },
-  { id: "events", label: "Events" },
-  { id: "transactions", label: "Transactions" },
-  { id: "abi", label: "ABI" },
-];
+import { CONTRACT_TABS, type ContractTab } from "./tabs";
 
 export function ContractTabs({
   basePath,
@@ -35,7 +19,7 @@ export function ContractTabs({
     if (id === "read") return counts.readFunctions;
     if (id === "write") return counts.writeFunctions;
     if (id === "events") return counts.events;
-    if (id === "transactions") return txCount;
+    if (id === "transactions") return txCount || undefined;
     return undefined;
   };
 
@@ -57,22 +41,22 @@ export function ContractTabs({
   }, [active]);
 
   return (
-    <nav ref={navRef} className="contract-tabs" aria-label="Contract views">
-      {TABS.map((tab) => {
+    <nav ref={navRef} className="tabs" aria-label="Contract views">
+      {CONTRACT_TABS.map((tab) => {
         const count = countFor(tab.id);
+        const isActive = active === tab.id;
         return (
-          <NavLink
+          <Link
             key={tab.id}
-            ref={active === tab.id ? activeRef : undefined}
-            to={`${basePath}/${tab.id}`}
-            className={({ isActive }) =>
-              cn("contract-tab", (isActive || active === tab.id) && "active")
-            }
-            aria-current={active === tab.id ? "page" : undefined}
+            ref={isActive ? activeRef : undefined}
+            to={tab.id === "read" ? basePath : `${basePath}/${tab.id}`}
+            replace
+            className={cn("tab", isActive && "active")}
+            aria-current={isActive ? "page" : undefined}
           >
             {tab.label}
             {count !== undefined && <span className="tab-count">{count}</span>}
-          </NavLink>
+          </Link>
         );
       })}
     </nav>

@@ -53,7 +53,6 @@ function FieldEditor({
   if (depth < dimensions.length) {
     if (field.kind !== "array") return null;
     const dynamic = dimensions[depth] === null;
-    const size = dimensions[depth];
 
     return (
       <div className={cn("arg-group", topLevel && "top-level")}>
@@ -113,7 +112,7 @@ function FieldEditor({
             </div>
           ))}
           {field.items.length === 0 && (
-            <p className="array-empty">Empty array — that is valid for a dynamic type.</p>
+            <p className="array-empty">Empty list</p>
           )}
         </div>
 
@@ -133,7 +132,7 @@ function FieldEditor({
               })
             }
           >
-            Add {size === null ? "item" : "item"}
+            Add item
           </Button>
         )}
         {error && <p className="field-error">{error}</p>}
@@ -258,13 +257,7 @@ export function ArgsForm({
   errors: ArgErrors;
   disabled?: boolean;
 }) {
-  if (inputs.length === 0) {
-    return (
-      <p className="no-args">
-        This method takes no arguments.
-      </p>
-    );
-  }
+  if (inputs.length === 0) return null;
 
   return (
     <div className="args-form">
