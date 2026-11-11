@@ -430,13 +430,18 @@ export function ImportPage() {
         title="Import a contract"
         description="Bind an ABI you already have to a deployed address. Explorer verification is optional, never required."
         actions={
-          <Button
-            variant="ghost"
-            icon={<ArrowLeft size={15} />}
-            onClick={() => navigate("/")}
-          >
-            Back to contracts
-          </Button>
+          <>
+            <Link to="/import/project" className="btn btn-secondary">
+              <FolderInput size={15} /> Import a Foundry project
+            </Link>
+            <Button
+              variant="ghost"
+              icon={<ArrowLeft size={15} />}
+              onClick={() => navigate("/")}
+            >
+              Back to contracts
+            </Button>
+          </>
         }
       />
 

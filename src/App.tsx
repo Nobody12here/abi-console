@@ -4,6 +4,7 @@ import { AppHeader } from "@/components/layout/AppHeader";
 import { ScrollToTop } from "@/components/layout/ScrollToTop";
 import { HomePage } from "@/pages/HomePage";
 import { ImportPage } from "@/pages/ImportPage";
+import { ProjectImportPage } from "@/pages/ProjectImportPage";
 import { ContractPage } from "@/pages/ContractPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
@@ -17,6 +18,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/import" element={<ImportPage />} />
+          <Route path="/import/project" element={<ProjectImportPage />} />
           <Route
             path="/contract/:chainId/:address/:tab?"
             element={<ContractPage />}

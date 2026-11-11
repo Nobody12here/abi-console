@@ -1658,7 +1658,8 @@ textarea.field.compact {
 
 
 .contract-table-head {
-  padding: 9px 14px;
+  /* Right padding matches the row's action buttons so columns line up. */
+  padding: 9px 70px 9px 14px;
   border-bottom: 1px solid var(--line);
   background: var(--surface-2);
   color: var(--faint);
@@ -1712,6 +1713,12 @@ textarea.field.compact {
   display: flex;
   align-items: center;
   gap: 9px;
+  min-width: 0;
+}
+
+.contract-row-text {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
 }
 
@@ -5121,6 +5128,189 @@ textarea.field.compact {
 
 .notfound-page .empty-state {
   width: 100%;
+}
+
+/* Bulk project import */
+
+.project-import-page .panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.project-import-page .drop-zone code {
+  padding: 0 4px;
+}
+
+.project-import-page .issue-box {
+  margin-top: 0;
+}
+
+.proj-project-name {
+  max-width: 420px;
+}
+
+.proj-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 12px;
+}
+
+.proj-table {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.proj-grid {
+  display: grid;
+  grid-template-columns: 24px minmax(160px, 1.2fr) 150px minmax(180px, 1.4fr) 150px;
+  align-items: start;
+  gap: 12px;
+  padding: 10px 14px;
+}
+
+.proj-head {
+  align-items: center;
+  padding-top: 9px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.proj-row + .proj-row {
+  border-top: 1px solid var(--line);
+}
+
+.proj-row.is-muted .proj-name,
+.proj-row.is-muted .proj-address {
+  opacity: 0.7;
+}
+
+.proj-check {
+  width: 15px;
+  height: 15px;
+  margin: 8px 0 0;
+  accent-color: var(--teal-2);
+}
+
+.proj-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.proj-cell small {
+  color: var(--faint);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.proj-cell .field {
+  height: 32px;
+  font-size: 12.5px;
+}
+
+.proj-address {
+  flex-direction: row;
+  align-items: center;
+  height: 32px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.proj-path {
+  display: block;
+  padding-top: 7px;
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.proj-status {
+  flex-flow: row wrap;
+  gap: 5px;
+  padding-top: 5px;
+}
+
+.proj-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Project groups on the contracts list */
+
+.contract-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.project-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.project-group-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  padding: 4px 6px 4px 2px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.project-group-heading:hover {
+  color: var(--text);
+}
+
+.project-group-heading strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.project-group-heading span {
+  color: var(--faint);
+  font-size: 12px;
+}
+
+.project-group-chevron {
+  transition: transform 0.15s ease;
+}
+
+.project-group-chevron.rotate {
+  transform: rotate(90deg);
+}
+
+@media (max-width: 900px) {
+  .proj-head {
+    display: none;
+  }
+
+  .proj-grid {
+    grid-template-columns: 24px minmax(0, 1fr);
+  }
+
+  .proj-grid > :nth-child(n + 3) {
+    grid-column: 2;
+  }
 }
 
 /* Scrollbars */

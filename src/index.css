@@ -1,196 +1,248 @@
+
+@import url("https://fonts.googleapis.com/css2?family=Almarai:wght@400;500;600;700&family=Amiri:wght@400;700&display=swap");
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/ibm-plex-sans";
-@import "@fontsource/ibm-plex-mono/400.css";
-@import "@fontsource/ibm-plex-mono/500.css";
-@import "@fontsource/ibm-plex-mono/600.css";
 
 @custom-variant dark (&:is(.dark *));
 
+/* =========================================
+   THEME CONFIGURATION
+   ========================================= */
+
 @theme inline {
-  --font-heading: "IBM Plex Sans", sans-serif;
-  --font-sans: "IBM Plex Sans", sans-serif;
-  --font-mono: "IBM Plex Mono", monospace;
+    --font-heading: "BJCree", serif;
+    --font-sans: "Libre Caslon Text", serif;
 
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
-  --color-foreground: var(--foreground);
-  --color-background: var(--background);
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
 
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+    --color-chart-1: var(--chart-1);
+    --color-chart-2: var(--chart-2);
+    --color-chart-3: var(--chart-3);
+    --color-chart-4: var(--chart-4);
+    --color-chart-5: var(--chart-5);
+
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --radius-2xl: calc(var(--radius) * 1.8);
+    --radius-3xl: calc(var(--radius) * 2.2);
+    --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* Dark-first palette: ABI Console ink surfaces with forest-green brand accents. */
+/* =========================================
+   DARK FOREST THEME
+   ========================================= */
+
 :root {
-  color-scheme: dark;
+    color-scheme: dark;
 
-  --background: #0E0E0C;
-  --foreground: #EDE8DD;
-  --card: #121411;
-  --card-foreground: #EDE8DD;
-  --popover: #171A16;
-  --popover-foreground: #EDE8DD;
+    --background: #0e0e0c;
+    --foreground: #ede8dd;
 
-  --primary: #08463A;
-  --primary-foreground: #F4F5EF;
-  --secondary: #1C211C;
-  --secondary-foreground: #D7DDD4;
-  --muted: #1C211C;
-  --muted-foreground: #A0A69B;
-  --accent: #222922;
-  --accent-foreground: #EDE8DD;
-  --destructive: #F08476;
-  --border: #272D27;
-  --input: #303830;
-  --ring: #4CA88F;
+    --card: #151512;
+    --card-foreground: #ede8dd;
 
-  --chart-1: #4CA88F;
-  --chart-2: #8AAFFF;
-  --chart-3: #E9B86D;
-  --chart-4: #B8A1FF;
-  --chart-5: #F08476;
+    --popover: #151512;
+    --popover-foreground: #ede8dd;
 
-  --radius: 0.625rem;
+    /* Primary: Forest Green */
+    --primary: #08463a;
+    --primary-foreground: #ede8dd;
 
-  --sidebar: #121411;
-  --sidebar-foreground: #EDE8DD;
-  --sidebar-primary: #08463A;
-  --sidebar-primary-foreground: #F4F5EF;
-  --sidebar-accent: #222922;
-  --sidebar-accent-foreground: #EDE8DD;
-  --sidebar-border: #272D27;
-  --sidebar-ring: #4CA88F;
+    --secondary: #1b211c;
+    --secondary-foreground: #ede8dd;
+
+    --muted: #1b1b17;
+    --muted-foreground: #b3ada1;
+
+    --accent: #19372d;
+    --accent-foreground: #dce8dd;
+
+    --destructive: #a94442;
+
+    --border: #2b2c25;
+    --input: #292b24;
+    --ring: #397c65;
+
+    /* Data visualization */
+    --chart-1: #397c65;
+    --chart-2: #c8a15a;
+    --chart-3: #8caa91;
+    --chart-4: #9b8060;
+    --chart-5: #777b69;
+
+    --radius: 0.625rem;
+
+    /* Sidebar */
+    --sidebar: #11120f;
+    --sidebar-foreground: #ede8dd;
+    --sidebar-primary: #08463a;
+    --sidebar-primary-foreground: #ede8dd;
+    --sidebar-accent: #19372d;
+    --sidebar-accent-foreground: #dce8dd;
+    --sidebar-border: #2b2c25;
+    --sidebar-ring: #397c65;
 }
 
-/* Keep shadcn's .dark mode selector compatible with the dark-first defaults. */
+/* Explicit dark-mode values for shadcn components */
 .dark {
-  color-scheme: dark;
-  --background: #0E0E0C;
-  --foreground: #EDE8DD;
-  --card: #121411;
-  --card-foreground: #EDE8DD;
-  --popover: #171A16;
-  --popover-foreground: #EDE8DD;
-  --primary: #08463A;
-  --primary-foreground: #F4F5EF;
-  --secondary: #1C211C;
-  --secondary-foreground: #D7DDD4;
-  --muted: #1C211C;
-  --muted-foreground: #A0A69B;
-  --accent: #222922;
-  --accent-foreground: #EDE8DD;
-  --destructive: #F08476;
-  --border: #272D27;
-  --input: #303830;
-  --ring: #4CA88F;
-  --chart-1: #4CA88F;
-  --chart-2: #8AAFFF;
-  --chart-3: #E9B86D;
-  --chart-4: #B8A1FF;
-  --chart-5: #F08476;
-  --sidebar: #121411;
-  --sidebar-foreground: #EDE8DD;
-  --sidebar-primary: #08463A;
-  --sidebar-primary-foreground: #F4F5EF;
-  --sidebar-accent: #222922;
-  --sidebar-accent-foreground: #EDE8DD;
-  --sidebar-border: #272D27;
-  --sidebar-ring: #4CA88F;
+    color-scheme: dark;
+
+    --background: #0e0e0c;
+    --foreground: #ede8dd;
+
+    --card: #151512;
+    --card-foreground: #ede8dd;
+
+    --popover: #151512;
+    --popover-foreground: #ede8dd;
+
+    --primary: #08463a;
+    --primary-foreground: #ede8dd;
+
+    --secondary: #1b211c;
+    --secondary-foreground: #ede8dd;
+
+    --muted: #1b1b17;
+    --muted-foreground: #b3ada1;
+
+    --accent: #19372d;
+    --accent-foreground: #dce8dd;
+
+    --destructive: #a94442;
+
+    --border: #2b2c25;
+    --input: #292b24;
+    --ring: #397c65;
+
+    --chart-1: #397c65;
+    --chart-2: #c8a15a;
+    --chart-3: #8caa91;
+    --chart-4: #9b8060;
+    --chart-5: #777b69;
+
+    --sidebar: #11120f;
+    --sidebar-foreground: #ede8dd;
+    --sidebar-primary: #08463a;
+    --sidebar-primary-foreground: #ede8dd;
+    --sidebar-accent: #19372d;
+    --sidebar-accent-foreground: #dce8dd;
+    --sidebar-border: #2b2c25;
+    --sidebar-ring: #397c65;
 }
 
-/* The existing app.css theme switch uses data-theme="light". */
-:root[data-theme="light"] {
-  color-scheme: light;
-  --background: #F2F4F1;
-  --foreground: #172019;
-  --card: #FFFFFF;
-  --card-foreground: #172019;
-  --popover: #FFFFFF;
-  --popover-foreground: #172019;
-  --primary: #08463A;
-  --primary-foreground: #FFFFFF;
-  --secondary: #EDF1EC;
-  --secondary-foreground: #26372C;
-  --muted: #EDF1EC;
-  --muted-foreground: #5F6D61;
-  --accent: #E7EDE7;
-  --accent-foreground: #172019;
-  --destructive: #B33226;
-  --border: #D9E0D8;
-  --input: #D0D9D0;
-  --ring: #0B5A49;
-  --chart-1: #08463A;
-  --chart-2: #285FC4;
-  --chart-3: #96520B;
-  --chart-4: #7043BD;
-  --chart-5: #B33226;
-  --sidebar: #F7F9F6;
-  --sidebar-foreground: #172019;
-  --sidebar-primary: #08463A;
-  --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #E7EDE7;
-  --sidebar-accent-foreground: #172019;
-  --sidebar-border: #D9E0D8;
-  --sidebar-ring: #0B5A49;
-}
+/* =========================================
+   BASE STYLES
+   ========================================= */
+
+/* =========================================
+   BASE STYLES
+   ========================================= */
 
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
+    * {
+        @apply border-border outline-ring/50;
+    }
 
-  html {
-    @apply font-sans;
-  }
+    html {
+        @apply font-sans;
+        font-family: "Libre Caslon Text", serif;
+    }
 
-  body {
-    @apply bg-background text-foreground;
-    font-family: "IBM Plex Sans", sans-serif;
-  }
+    body {
+        @apply bg-background text-foreground;
+        font-family: "Libre Caslon Text", serif;
+        font-weight: 400;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
 
-  code,
-  kbd,
-  pre,
-  samp {
-    font-family: "IBM Plex Mono", monospace;
-  }
+    /* Main headings */
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+        font-family: "BJCree", serif;
+        font-weight: 400;
+        line-height: 1.2;
+        text-wrap: balance;
+    }
 
-  ::selection {
-    background: rgba(8, 70, 58, 0.35);
-    color: var(--foreground);
-  }
+    h1 {
+        letter-spacing: -0.025em;
+    }
+
+    h2,
+    h3 {
+        letter-spacing: -0.015em;
+    }
+
+    /* Form controls inherit the body font */
+    button,
+    input,
+    textarea,
+    select {
+        font-family: "Libre Caslon Text", serif;
+    }
+
+    button {
+        cursor: pointer;
+    }
+
+    ::selection {
+        background: #08463a;
+        color: #ede8dd;
+    }
+
+    :focus-visible {
+        outline-color: #397c65;
+    }
+}
+
+/* =========================================
+   OPTIONAL TYPOGRAPHY UTILITIES
+   ========================================= */
+
+@layer utilities {
+    .font-heading {
+        font-family: "BJCree", serif;
+    }
+
+    .font-body {
+        font-family: "Libre Caslon Text", serif;
+    }
 }

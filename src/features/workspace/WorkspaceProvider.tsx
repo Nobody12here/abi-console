@@ -22,6 +22,11 @@ import type {
   WorkspaceState,
 } from "@/features/abi/types";
 import { bindingId, defaultState, loadWorkspace, saveTheme, saveWorkspace } from "@/features/storage/workspace";
+import {
+  applyProjectImport,
+  type ProjectImportInput,
+  type ProjectImportResult,
+} from "@/features/storage/projectImport";
 import { makeId } from "@/lib/format";
 import { createReadClient } from "@/lib/rpc";
 import { errorMessage } from "@/features/execution/errors";
@@ -48,6 +53,7 @@ type WorkspaceContextValue = {
   revisionFor: (binding: ContractBinding | undefined) => AbiRevision | undefined;
   createRevision: (imported: ImportedAbi, source: AbiSource) => AbiRevision;
   saveContract: (input: SaveContractInput) => ContractBinding;
+  importProject: (input: ProjectImportInput) => ProjectImportResult;
   updateBinding: (
     id: string,
     patch: Partial<Omit<ContractBinding, "id">>,
@@ -312,6 +318,19 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [apply],
   );
 
+  const importProject = useCallback(
+    (input: ProjectImportInput): ProjectImportResult => {
+      const { state: next, result } = applyProjectImport(
+        stateRef.current,
+        input,
+      );
+      stateRef.current = next;
+      setState(next);
+      return result;
+    },
+    [],
+  );
+
   const updateBinding = useCallback(
     (id: string, patch: Partial<Omit<ContractBinding, "id">>) => {
       apply((current) => ({
@@ -518,6 +537,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       revisionFor,
       createRevision,
       saveContract,
+      importProject,
       updateBinding,
       removeBinding,
       setActiveRevision,
@@ -544,6 +564,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       revisionFor,
       createRevision,
       saveContract,
+      importProject,
       updateBinding,
       removeBinding,
       setActiveRevision,

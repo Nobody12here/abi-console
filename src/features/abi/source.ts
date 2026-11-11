@@ -10,6 +10,8 @@ export function sourceLabel(source: AbiSource): string {
       return source.url;
     case "explorer":
       return "Etherscan (verified)";
+    case "foundry":
+      return source.artifactPath;
     case "legacy":
       return "Legacy import";
   }
@@ -25,6 +27,8 @@ export function sourceKindLabel(source: AbiSource): string {
       return "URL";
     case "explorer":
       return "Explorer";
+    case "foundry":
+      return "Foundry";
     case "legacy":
       return "Legacy";
   }

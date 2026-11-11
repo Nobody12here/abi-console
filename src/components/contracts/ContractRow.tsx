@@ -21,13 +21,15 @@ export function ContractRow({
         className="contract-row-main"
         to={`/contract/${binding.chainId}/${binding.address}/overview`}
       >
-        <span className="contract-row-icon">
-          <FileCode2 size={16} />
-        </span>
         <span className="contract-row-identity">
-          <span className="contract-row-name">{binding.name}</span>
-          <span className="contract-row-meta mono">
-            {shortenAddress(binding.address, 6)}
+          <span className="contract-row-icon">
+            <FileCode2 size={16} />
+          </span>
+          <span className="contract-row-text">
+            <span className="contract-row-name">{binding.name}</span>
+            <span className="contract-row-meta mono">
+              {shortenAddress(binding.address, 6)}
+            </span>
           </span>
         </span>
         <span className="contract-row-chain">

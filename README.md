@@ -7,6 +7,7 @@ A local-first workbench for talking to any deployed EVM contract **with an ABI y
 ## What it does
 
 - **Import an interface from anywhere.** Foundry/Hardhat/Truffle artifacts, a bare ABI array, a JSON file, a URL, or an optional Etherscan lookup with your own API key.
+- **Import a whole Foundry project in one step.** Drop the project folder and every contract your `forge script` run deployed to Sepolia is imported with its ABI. See [Importing a Foundry project](#importing-a-foundry-project).
 - **Bind it to a deployed address.** Static chain registry (13 networks, including Anvil/localhost), EIP-55 validation, and a bytecode presence check with proxy hints.
 - **Read with confidence.** Typed argument fields for tuples and nested arrays, calldata preview, selector display, block pinning, and structured results.
 - **Write safely.** Every write must pass `eth_call` simulation first. Value is checked against your balance, large values require explicit confirmation, and errors are decoded against the ABI. Writes are never auto-retried.
@@ -33,6 +34,32 @@ bun run preview    # serve the production build
 
 There is no server component. The only optional build-time setting is `VITE_WALLET_CONNECT_PROJECT_ID`, a public identifier used by WalletConnect-based mobile wallets; injected browser wallets work without it. Your Etherscan key is never a build setting — add it in **Settings**.
 
+## Importing a Foundry project
+
+After deploying with `forge script`, open **Import contract → Import a Foundry project** (or the "Foundry project" row on the home page), then drop the project folder:
+
+```bash
+forge script script/Deploy.s.sol --rpc-url sepolia --broadcast
+```
+
+The console reads two folders, entirely in your browser, and uploads nothing:
+
+| Folder | Used for |
+| --- | --- |
+| `broadcast/<Script>.s.sol/11155111/run-latest.json` | Name and address of every contract the script created |
+| `out/<File>.sol/<Name>.json` | The ABI (the `out` setting in `foundry.toml` is respected) |
+
+Review the list, then click **Import**. Each address is checked for code on Sepolia first; contracts with no code start unchecked, contracts already saved are marked, and contracts imported together are grouped under the project name on the home page.
+
+Notes:
+
+- Only Sepolia is imported. Deployments on other chains are listed in a note and ignored.
+- `dry-run/` output and older timestamped runs are ignored; only `run-latest.json` counts.
+- Contracts created by another contract (factories) have no name in the broadcast file. They start unchecked with an ABI picker.
+- Two deployments of the same contract get their address appended to the name.
+- Proxies get no special handling: a proxy is imported with its own ABI.
+- `forge create` writes no broadcast file, so it is not supported. Use `forge script`.
+
 ## Bring your own keys
 
 | Key / endpoint | Required? | Used for | Stored where |
@@ -57,7 +84,7 @@ Custom chain creation is intentionally deferred because it requires rebuilding t
 src/
   App.tsx                    route shell, toaster, footer
   main.tsx                   providers: wagmi → query → workspace → RainbowKit → router
-  pages/                     Home, Import, Contract, Settings, NotFound
+  pages/                     Home, Import, ProjectImport, Contract, Settings, NotFound
   components/
     layout/                  top bar, brand, page header, error boundary
     ui/                      Button, Badge, ChainBadge, CopyButton, Dialog, Spinner, EmptyState
@@ -66,6 +93,7 @@ src/
                              argument form, result view, transactions, events, ABI panel
   features/
     abi/                     types, source metadata, normalization + hashing, selectors
+    foundry/                 project folder access, broadcast parsing, artifact matching, import plan
     execution/               recursive argument trees, error decoding
     storage/                 IndexedDB workspace with localStorage fallback + legacy migration
     workspace/               React context, revisions, bindings, transactions, settings

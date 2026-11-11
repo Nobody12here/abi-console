@@ -6,6 +6,7 @@ export type AbiSource =
   | { kind: "paste" }
   | { kind: "url"; url: string }
   | { kind: "explorer"; provider: "etherscan"; verified: true }
+  | { kind: "foundry"; artifactPath: string; script: string }
   | { kind: "legacy" };
 
 export type AbiCounts = {
@@ -52,6 +53,8 @@ export type ContractBinding = {
   activeRevisionId: string;
   revisionIds: string[];
   codeInfo?: CodeInfo;
+  /** Set when the contract came from a bulk project import; used for grouping. */
+  project?: string;
   lastOpenedAt: string;
   createdAt: string;
   updatedAt: string;

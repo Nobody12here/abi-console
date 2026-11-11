@@ -5,8 +5,10 @@ import {
   ArrowRight,
   ArrowUpRight,
   Braces,
+  ChevronRight,
   FileJson2,
   FolderInput,
+  FolderTree,
   Link2,
   Plus,
   Search,
@@ -22,7 +24,43 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { PageHeader } from "@/components/layout/Brand";
 import { Spinner } from "@/components/ui/Spinner";
-import { relativeTime } from "@/lib/format";
+import { plural, relativeTime } from "@/lib/format";
+import { cn } from "@/lib/utils";
+
+function ContractTable({
+  items,
+  showHead,
+  revisionFor,
+  onDelete,
+}: {
+  items: ContractBinding[];
+  showHead: boolean;
+  revisionFor: ReturnType<typeof useWorkspace>["revisionFor"];
+  onDelete: (binding: ContractBinding) => void;
+}) {
+  return (
+    <div className="contract-table">
+      {showHead && (
+        <div className="contract-table-head" aria-hidden="true">
+          <span>Contract</span>
+          <span>Chain</span>
+          <span>Methods</span>
+          <span>ABI hash</span>
+          <span>Source</span>
+          <span>Opened</span>
+        </div>
+      )}
+      {items.map((binding) => (
+        <ContractRow
+          key={binding.id}
+          binding={binding}
+          revision={revisionFor(binding)}
+          onDelete={onDelete}
+        />
+      ))}
+    </div>
+  );
+}
 
 export function HomePage() {
   const {
@@ -37,6 +75,7 @@ export function HomePage() {
   const [pendingDelete, setPendingDelete] = useState<ContractBinding | null>(
     null,
   );
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   const sorted = useMemo(
     () =>
@@ -52,11 +91,35 @@ export function HomePage() {
     const needle = search.trim().toLowerCase();
     if (!needle) return sorted;
     return sorted.filter((binding) =>
-      `${binding.name} ${binding.address} ${binding.chainId}`
+      `${binding.name} ${binding.project ?? ""} ${binding.address} ${binding.chainId}`
         .toLowerCase()
         .includes(needle),
     );
   }, [search, sorted]);
+
+  // Contracts imported from a project are grouped; the rest stay in one list.
+  const { loose, groups } = useMemo(() => {
+    const byProject = new Map<string, ContractBinding[]>();
+    const rest: ContractBinding[] = [];
+    for (const binding of filtered) {
+      if (!binding.project) {
+        rest.push(binding);
+        continue;
+      }
+      byProject.set(binding.project, [
+        ...(byProject.get(binding.project) ?? []),
+        binding,
+      ]);
+    }
+    return { loose: rest, groups: [...byProject.entries()] };
+  }, [filtered]);
+
+  const toggleGroup = (project: string) =>
+    setCollapsed((current) => {
+      const next = new Set(current);
+      if (!next.delete(project)) next.add(project);
+      return next;
+    });
 
   const methods = bindings.reduce(
     (total, binding) => total + (revisionFor(binding)?.counts.functions ?? 0),
@@ -121,8 +184,19 @@ export function HomePage() {
         <aside className="source-index" aria-label="Import sources">
           <div className="source-index-heading">
             <p className="eyebrow">START FROM</p>
-            <span>4 sources</span>
+            <span>5 sources</span>
           </div>
+
+          <Link to="/import/project" className="source-row">
+            <span className="source-row-icon">
+              <FolderTree size={17} />
+            </span>
+            <span>
+              <strong>Foundry project</strong>
+              <small>Every contract from forge script</small>
+            </span>
+            <ArrowRight size={15} />
+          </Link>
 
           <Link to="/import?source=file" className="source-row">
             <span className="source-row-icon">
@@ -243,13 +317,18 @@ export function HomePage() {
               </>
             }
             action={
-              <Button
-                variant="primary"
-                icon={<Plus size={15} />}
-                onClick={() => navigate("/import")}
-              >
-                Import your first contract
-              </Button>
+              <div className="empty-state-actions">
+                <Button
+                  variant="primary"
+                  icon={<Plus size={15} />}
+                  onClick={() => navigate("/import")}
+                >
+                  Import your first contract
+                </Button>
+                <Link to="/import/project" className="btn btn-ghost">
+                  <FolderTree size={15} /> Import a Foundry project
+                </Link>
+              </div>
             }
           />
         ) : filtered.length === 0 ? (
@@ -260,23 +339,44 @@ export function HomePage() {
             </button>
           </div>
         ) : (
-          <div className="contract-table">
-            <div className="contract-table-head" aria-hidden="true">
-              <span>Contract</span>
-              <span>Chain</span>
-              <span>Methods</span>
-              <span>ABI hash</span>
-              <span>Source</span>
-              <span>Opened</span>
-            </div>
-            {filtered.map((binding) => (
-              <ContractRow
-                key={binding.id}
-                binding={binding}
-                revision={revisionFor(binding)}
+          <div className="contract-groups">
+            {loose.length > 0 && (
+              <ContractTable
+                items={loose}
+                showHead
+                revisionFor={revisionFor}
                 onDelete={setPendingDelete}
               />
-            ))}
+            )}
+            {groups.map(([project, items], index) => {
+              const open = !collapsed.has(project) || Boolean(search.trim());
+              return (
+                <div key={project} className="project-group">
+                  <button
+                    type="button"
+                    className="project-group-heading"
+                    aria-expanded={open}
+                    onClick={() => toggleGroup(project)}
+                  >
+                    <ChevronRight
+                      size={14}
+                      className={cn("project-group-chevron", open && "rotate")}
+                    />
+                    <FolderTree size={14} />
+                    <strong>{project}</strong>
+                    <span>{plural(items.length, "contract")}</span>
+                  </button>
+                  {open && (
+                    <ContractTable
+                      items={items}
+                      showHead={loose.length === 0 && index === 0}
+                      revisionFor={revisionFor}
+                      onDelete={setPendingDelete}
+                    />
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </section>

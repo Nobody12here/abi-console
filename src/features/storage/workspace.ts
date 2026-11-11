@@ -9,6 +9,7 @@ import type {
   WorkspaceState,
 } from "@/features/abi/types";
 import { makeId } from "@/lib/format";
+import { bindingId } from "./ids";
 
 const store = createStore("abiconsole", "workspace-v2");
 const STATE_KEY = "state";
@@ -54,9 +55,7 @@ export function defaultState(): WorkspaceState {
   };
 }
 
-export function bindingId(chainId: number, address: string): string {
-  return `${chainId}:${getAddress(address)}`;
-}
+export { bindingId } from "./ids";
 
 function hydrateState(value: unknown): WorkspaceState {
   if (!value || typeof value !== "object") return defaultState();
