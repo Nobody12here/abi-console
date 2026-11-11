@@ -8,7 +8,6 @@ import { fsDirFromFileList, type FsDir, type FsNode } from "./fs";
 import {
   buildPlan,
   disambiguateNames,
-  importStatus,
   loadArtifact,
   pickArtifact,
 } from "./plan";
@@ -330,15 +329,6 @@ describe("buildPlan", () => {
   });
 });
 
-describe("importStatus", () => {
-  const abi = normalizeAbi(tokenAbi);
-  it("distinguishes new, same, and changed ABIs", () => {
-    expect(importStatus({ abi }, undefined)).toBe("new");
-    expect(importStatus({ abi }, { activeRevisionHash: abi.hash })).toBe("same");
-    expect(importStatus({ abi }, { activeRevisionHash: "0xother" })).toBe("update");
-  });
-});
-
 describe("fsDirFromFileList", () => {
   function file(path: string, content: string): File {
     const value = new File([content], path.split("/").pop()!);
@@ -370,6 +360,7 @@ describe("applyProjectImport", () => {
     bindings: [],
     revisions: [],
     txs: [],
+    workspaces: [],
     settings: {
       theme: "dark",
       rpcOverrides: {},
@@ -384,65 +375,65 @@ describe("applyProjectImport", () => {
     { type: "function", name: "paused", stateMutability: "view", inputs: [], outputs: [{ type: "bool" }] },
   ]);
   const source = { kind: "foundry" as const, artifactPath: "out/T.sol/T.json", script: "Deploy.s.sol" };
+  const entries = [
+    { name: "Token", address: A, imported: abiA, source },
+    { name: "Token2", address: B, imported: abiA, source },
+    { name: "Vault", address: C, imported: abiB, source },
+  ];
 
-  it("saves many contracts at once and shares identical ABIs", () => {
+  it("creates a new workspace holding every contract, and activates it", () => {
     const { state, result } = applyProjectImport(empty(), {
-      project: "  my-protocol ",
+      name: "  my-protocol ",
       chainId: SEPOLIA,
-      entries: [
-        { name: "Token", address: A, imported: abiA, source },
-        { name: "Token2", address: B, imported: abiA, source },
-        { name: "Vault", address: C, imported: abiB, source },
-      ],
+      entries,
     });
-    expect(result).toEqual({ added: 3, updated: 0, unchanged: 0 });
+    expect(result).toMatchObject({ workspaceName: "my-protocol", added: 3 });
+    expect(state.workspaces).toHaveLength(1);
+    const workspaceId = state.workspaces[0].id;
+    expect(state.settings.activeWorkspaceId).toBe(workspaceId);
     expect(state.bindings.map((item) => item.name)).toEqual(["Token", "Token2", "Vault"]);
-    expect(state.bindings.every((item) => item.project === "my-protocol")).toBe(true);
+    expect(state.bindings.every((item) => item.workspaceId === workspaceId)).toBe(true);
+    // Identical ABIs are stored once.
     expect(state.revisions).toHaveLength(2);
-    expect(state.bindings[0].activeRevisionId).toBe(state.bindings[1].activeRevisionId);
   });
 
-  it("updates changed ABIs, keeps names, and leaves identical ones alone", () => {
-    const first = applyProjectImport(empty(), {
-      project: "p",
-      chainId: SEPOLIA,
-      entries: [
-        { name: "Token", address: A, imported: abiA, source },
-        { name: "Vault", address: B, imported: abiA, source },
-      ],
-    }).state;
-    const renamed = {
-      ...first,
-      bindings: first.bindings.map((item) =>
-        item.address === getAddress(A) ? { ...item, name: "My renamed token" } : item,
-      ),
+  it("gives every import its own workspace, even for the same addresses", () => {
+    const first = applyProjectImport(empty(), { name: "contracts", chainId: SEPOLIA, entries });
+    const second = applyProjectImport(first.state, { name: "contracts", chainId: SEPOLIA, entries });
+
+    expect(second.result.workspaceName).toBe("contracts (2)");
+    expect(second.state.workspaces).toHaveLength(2);
+    expect(second.state.bindings).toHaveLength(6);
+    // Binding ids never collide across workspaces.
+    expect(new Set(second.state.bindings.map((item) => item.id)).size).toBe(6);
+    // The first workspace is untouched.
+    const firstId = first.state.workspaces[0].id;
+    expect(second.state.bindings.filter((item) => item.workspaceId === firstId)).toHaveLength(3);
+    expect(second.state.settings.activeWorkspaceId).toBe(second.state.workspaces[1].id);
+  });
+
+  it("does not touch contracts already saved in the default workspace", () => {
+    const before = applyProjectImport(
+      { ...empty(), workspaces: [] },
+      { name: "p", chainId: SEPOLIA, entries: [entries[0]] },
+    ).state;
+    const withDefault: WorkspaceState = {
+      ...before,
+      bindings: before.bindings.map((item) => ({ ...item, workspaceId: undefined, id: `${SEPOLIA}:${getAddress(A)}` })),
+      workspaces: [],
     };
-
-    const { state, result } = applyProjectImport(renamed, {
-      project: "p",
-      chainId: SEPOLIA,
-      entries: [
-        { name: "Token", address: A, imported: abiB, source },
-        { name: "Vault", address: B, imported: abiA, source },
-        { name: "New", address: C, imported: abiA, source },
-      ],
-    });
-
-    expect(result).toEqual({ added: 1, updated: 1, unchanged: 1 });
-    const token = state.bindings.find((item) => item.address === getAddress(A))!;
-    expect(token.name).toBe("My renamed token");
-    expect(token.revisionIds).toHaveLength(2);
-    expect(token.activeRevisionId).not.toBe(first.bindings[0].activeRevisionId);
-    expect(state.bindings[0].name).toBe("New");
+    const { state } = applyProjectImport(withDefault, { name: "p", chainId: SEPOLIA, entries: [entries[0]] });
+    expect(state.bindings).toHaveLength(2);
+    expect(state.bindings.filter((item) => !item.workspaceId)).toHaveLength(1);
   });
 
-  it("leaves contracts ungrouped when the project name is blank", () => {
-    const { state } = applyProjectImport(empty(), {
-      project: "   ",
+  it("falls back to a default name and the address when names are blank", () => {
+    const { state, result } = applyProjectImport(empty(), {
+      name: "   ",
       chainId: SEPOLIA,
       entries: [{ name: "", address: A, imported: abiA, source }],
     });
-    expect(state.bindings[0].project).toBeUndefined();
+    expect(result.workspaceName).toBe("Foundry project");
     expect(state.bindings[0].name).toBe(getAddress(A));
   });
 });

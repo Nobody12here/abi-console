@@ -7,7 +7,7 @@ A local-first workbench for talking to any deployed EVM contract **with an ABI y
 ## What it does
 
 - **Import an interface from anywhere.** Foundry/Hardhat/Truffle artifacts, a bare ABI array, a JSON file, a URL, or an optional Etherscan lookup with your own API key.
-- **Import a whole Foundry project in one step.** Drop the project folder and every contract your `forge script` run deployed to Sepolia is imported with its ABI. See [Importing a Foundry project](#importing-a-foundry-project).
+- **Import a whole Foundry project in one step.** Drop the project folder and every contract your `forge script` run deployed to Sepolia is imported into a new workspace with its ABI. See [Importing a Foundry project](#importing-a-foundry-project).
 - **Bind it to a deployed address.** Static chain registry (13 networks, including Anvil/localhost), EIP-55 validation, and a bytecode presence check with proxy hints.
 - **Read with confidence.** Typed argument fields for tuples and nested arrays, calldata preview, selector display, block pinning, and structured results.
 - **Write safely.** Every write must pass `eth_call` simulation first. Value is checked against your balance, large values require explicit confirmation, and errors are decoded against the ABI. Writes are never auto-retried.
@@ -49,7 +49,9 @@ The console reads two folders, entirely in your browser, and uploads nothing:
 | `broadcast/<Script>.s.sol/11155111/run-latest.json` | Name and address of every contract the script created |
 | `out/<File>.sol/<Name>.json` | The ABI (the `out` setting in `foundry.toml` is respected) |
 
-Review the list, then click **Import**. Each address is checked for code on Sepolia first; contracts with no code start unchecked, contracts already saved are marked, and contracts imported together are grouped under the project name on the home page.
+Review the list, then click **Create workspace**. Each address is checked for code on Sepolia first; contracts with no code start unchecked.
+
+**Every project import creates its own workspace**, named after the folder (editable; a name that is already taken becomes "name (2)"). Workspaces are separate lists of contracts: switch between them on the home page, rename or delete an imported one, and the same address can live in several workspaces without clashing. Contracts you add one at a time go to the workspace you are viewing, by default "My contracts".
 
 Notes:
 
@@ -117,7 +119,8 @@ A workspace is a versioned object containing:
 - `bindings[]` — `id`, `name`, `chainId`, `address`, `activeRevisionId`, `revisionIds[]`, `codeInfo`, timestamps
 - `revisions[]` — `id`, `hash`, raw JSON, normalized ABI, source metadata, counts, warnings
 - `txs[]` — `id`, `contractId`, signature, selector, args, value, status, hash, receipt data, decoded errors
-- `settings` — theme, last chain, RPC overrides, Etherscan key, argument memory, confirmation threshold
+- `workspaces[]` — `id`, `name`, `createdAt` for workspaces created by imports (the default workspace is implicit; a binding's optional `workspaceId` says where it lives)
+- `settings` — theme, active workspace, last chain, RPC overrides, Etherscan key, argument memory, confirmation threshold
 
 Legacy records under the `abi-console-contracts` localStorage key are migrated once on first load; invalid entries are quarantined rather than silently dropped.
 

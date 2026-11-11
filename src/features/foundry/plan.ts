@@ -18,8 +18,6 @@ export type PlanRow = {
   abiError?: string;
 };
 
-export type ImportStatus = "new" | "update" | "same";
-
 type ArtifactResult = { imported: ImportedAbi } | { error: string };
 
 const jsonCache = new WeakMap<ArtifactRef, Promise<unknown>>();
@@ -149,15 +147,4 @@ export function disambiguateNames(rows: PlanRow[]): PlanRow[] {
       ? { ...row, name: `${row.name} (${shortenAddress(row.key, 4)})` }
       : row,
   );
-}
-
-/** What importing this row would do, given the contract already saved at this address. */
-export function importStatus(
-  row: Pick<PlanRow, "abi">,
-  existing: { activeRevisionHash?: string } | undefined,
-): ImportStatus {
-  if (!existing) return "new";
-  return row.abi && existing.activeRevisionHash === row.abi.hash
-    ? "same"
-    : "update";
 }

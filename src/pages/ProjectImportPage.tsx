@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import type { Address } from "viem";
 import { useWorkspace } from "@/features/workspace/WorkspaceProvider";
-import { bindingId } from "@/features/storage/workspace";
+import { uniqueWorkspaceName } from "@/features/storage/workspaces";
 import {
   canPickDirectory,
   droppedDirectory,
@@ -21,12 +21,7 @@ import {
 } from "@/features/foundry/fs";
 import { ProjectError, scanProject } from "@/features/foundry/project";
 import { readDeployments } from "@/features/foundry/broadcast";
-import {
-  buildPlan,
-  importStatus,
-  loadArtifact,
-  type PlanRow,
-} from "@/features/foundry/plan";
+import { buildPlan, loadArtifact, type PlanRow } from "@/features/foundry/plan";
 import { errorMessage } from "@/features/execution/errors";
 import { chainName } from "@/lib/chains";
 import { createReadClient } from "@/lib/rpc";
@@ -48,7 +43,7 @@ type CodeState = "checking" | "found" | "missing" | "error";
 
 export function ProjectImportPage() {
   const { ready } = useWorkspace();
-  // Whether a contract is already saved depends on the stored workspace.
+  // The suggested workspace name depends on the workspaces already saved.
   if (!ready) {
     return (
       <div className="page-loading">
@@ -62,14 +57,14 @@ export function ProjectImportPage() {
 
 function ProjectImport() {
   const navigate = useNavigate();
-  const { settings, bindings, getRevision, importProject } = useWorkspace();
+  const { settings, workspaces, importProject } = useWorkspace();
 
   const [phase, setPhase] = useState<Phase>("pick");
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const [rows, setRows] = useState<PlanRow[]>([]);
   const [notes, setNotes] = useState<string[]>([]);
-  const [project, setProject] = useState("");
+  const [workspaceName, setWorkspaceName] = useState("");
   const [names, setNames] = useState<Record<string, string>>({});
   const [overrides, setOverrides] = useState<Record<string, boolean>>({});
   const [codes, setCodes] = useState<Record<string, CodeState>>({});
@@ -102,30 +97,20 @@ function ProjectImport() {
     };
   }, [rowKeys, rpcUrl, checkRun]);
 
-  const savedByAddress = useMemo(
-    () => new Map(bindings.map((binding) => [binding.id, binding])),
-    [bindings],
-  );
-
   const view = rows.map((row) => {
-    const saved = savedByAddress.get(bindingId(CHAIN_ID, row.key));
-    const status = importStatus(row, {
-      activeRevisionHash: saved
-        ? getRevision(saved.activeRevisionId)?.hash
-        : undefined,
-    });
     const code = codes[row.key] ?? "checking";
     const selectable = Boolean(row.abi);
-    const checked =
-      selectable &&
-      (overrides[row.key] ??
-        (code !== "missing" && status !== "same"));
-    return { row, saved: Boolean(saved), status, code, selectable, checked };
+    const checked = selectable && (overrides[row.key] ?? code !== "missing");
+    return { row, code, selectable, checked };
   });
 
   const selected = view.filter((item) => item.checked);
   const checking = view.some((item) => item.code === "checking");
   const hasCheckErrors = view.some((item) => item.code === "error");
+  const finalName = uniqueWorkspaceName(
+    workspaceName,
+    workspaces.map((workspace) => workspace.name),
+  );
 
   const analyze = async (getRoot: () => Promise<FsDir | undefined>) => {
     const run = ++runId.current;
@@ -162,7 +147,7 @@ function ProjectImport() {
 
       setRows(plan);
       setNotes(nextNotes);
-      setProject(scan.name);
+      setWorkspaceName(scan.name);
       setNames({});
       setOverrides({});
       setCodes({});
@@ -231,14 +216,13 @@ function ProjectImport() {
 
     try {
       const result = importProject({
-        project,
+        name: workspaceName,
         chainId: CHAIN_ID,
         entries,
       });
-      const parts = [`${plural(result.added, "contract")} added`];
-      if (result.updated) parts.push(`${result.updated} updated`);
-      if (result.unchanged) parts.push(`${result.unchanged} unchanged`);
-      toast.success(`${parts.join(", ")}.`);
+      toast.success(
+        `Created workspace “${result.workspaceName}” with ${plural(result.added, "contract")}.`,
+      );
       navigate("/");
     } catch (caught) {
       toast.error(errorMessage(caught));
@@ -257,7 +241,7 @@ function ProjectImport() {
       <PageHeader
         eyebrow="BULK IMPORT"
         title="Import a Foundry project"
-        description={`Add every contract your forge scripts deployed to ${CHAIN_LABEL}, with its ABI, in one step.`}
+        description={`Creates a new workspace with every contract your forge scripts deployed to ${CHAIN_LABEL}, each with its ABI.`}
         actions={
           <Link to="/import" className="btn btn-ghost">
             <ArrowLeft size={15} /> Import one contract
@@ -368,14 +352,18 @@ function ProjectImport() {
           </div>
 
           <label className="field-group proj-project-name">
-            <span className="field-label">Project name</span>
+            <span className="field-label">Workspace name</span>
             <input
               className="field"
-              value={project}
-              onChange={(event) => setProject(event.target.value)}
-              placeholder="Used to group these contracts"
+              value={workspaceName}
+              onChange={(event) => setWorkspaceName(event.target.value)}
+              placeholder="Foundry project"
             />
-            <small>Contracts from this import are grouped under this name.</small>
+            <small>
+              {finalName !== (workspaceName.trim() || "Foundry project")
+                ? `A workspace with this name already exists, so this one will be called “${finalName}”.`
+                : "A new workspace is created for this import, separate from your other contracts."}
+            </small>
           </label>
 
           {notes.map((note) => (
@@ -422,7 +410,7 @@ function ProjectImport() {
               <span>Status</span>
             </div>
 
-            {view.map(({ row, status, code, selectable, checked, saved }) => {
+            {view.map(({ row, code, selectable, checked }) => {
               const picker = row.candidates.length > 1 || !row.deployment.contractName;
               return (
                 <div
@@ -511,12 +499,6 @@ function ProjectImport() {
                         Can’t check
                       </Badge>
                     )}
-                    {saved && status === "same" && (
-                      <Badge tone="muted">Already saved</Badge>
-                    )}
-                    {saved && status === "update" && (
-                      <Badge tone="amber">Updates ABI</Badge>
-                    )}
                   </div>
                 </div>
               );
@@ -533,7 +515,7 @@ function ProjectImport() {
             >
               {checking
                 ? "Checking addresses…"
-                : `Import ${plural(selected.length, "contract")}`}
+                : `Create workspace with ${plural(selected.length, "contract")}`}
             </Button>
             <Button variant="ghost" size="lg" onClick={reset}>
               Choose a different folder

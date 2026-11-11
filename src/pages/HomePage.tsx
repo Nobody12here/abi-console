@@ -5,7 +5,6 @@ import {
   ArrowRight,
   ArrowUpRight,
   Braces,
-  ChevronRight,
   FileJson2,
   FolderInput,
   FolderTree,
@@ -15,6 +14,7 @@ import {
   ShieldCheck,
   Sparkles,
   Terminal,
+  Trash2,
 } from "lucide-react";
 import { useWorkspace } from "@/features/workspace/WorkspaceProvider";
 import type { ContractBinding } from "@/features/abi/types";
@@ -25,48 +25,19 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { PageHeader } from "@/components/layout/Brand";
 import { Spinner } from "@/components/ui/Spinner";
 import { plural, relativeTime } from "@/lib/format";
-import { cn } from "@/lib/utils";
-
-function ContractTable({
-  items,
-  showHead,
-  revisionFor,
-  onDelete,
-}: {
-  items: ContractBinding[];
-  showHead: boolean;
-  revisionFor: ReturnType<typeof useWorkspace>["revisionFor"];
-  onDelete: (binding: ContractBinding) => void;
-}) {
-  return (
-    <div className="contract-table">
-      {showHead && (
-        <div className="contract-table-head" aria-hidden="true">
-          <span>Contract</span>
-          <span>Chain</span>
-          <span>Methods</span>
-          <span>ABI hash</span>
-          <span>Source</span>
-          <span>Opened</span>
-        </div>
-      )}
-      {items.map((binding) => (
-        <ContractRow
-          key={binding.id}
-          binding={binding}
-          revision={revisionFor(binding)}
-          onDelete={onDelete}
-        />
-      ))}
-    </div>
-  );
-}
+import { DEFAULT_WORKSPACE_ID } from "@/features/storage/workspaces";
 
 export function HomePage() {
   const {
     ready,
-    bindings,
-    txs,
+    bindings: allBindings,
+    activeBindings: bindings,
+    txs: allTxs,
+    workspaces,
+    activeWorkspace,
+    setActiveWorkspace,
+    renameWorkspace,
+    deleteWorkspace,
     removeBinding,
     revisionFor,
   } = useWorkspace();
@@ -75,7 +46,16 @@ export function HomePage() {
   const [pendingDelete, setPendingDelete] = useState<ContractBinding | null>(
     null,
   );
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [renaming, setRenaming] = useState(false);
+  const [renameDraft, setRenameDraft] = useState("");
+  const [deletingWorkspace, setDeletingWorkspace] = useState(false);
+  const isDefault = activeWorkspace.id === DEFAULT_WORKSPACE_ID;
+
+  // Numbers on this page describe the workspace being viewed.
+  const txs = useMemo(() => {
+    const ids = new Set(bindings.map((binding) => binding.id));
+    return allTxs.filter((tx) => ids.has(tx.contractId));
+  }, [allTxs, bindings]);
 
   const sorted = useMemo(
     () =>
@@ -91,35 +71,11 @@ export function HomePage() {
     const needle = search.trim().toLowerCase();
     if (!needle) return sorted;
     return sorted.filter((binding) =>
-      `${binding.name} ${binding.project ?? ""} ${binding.address} ${binding.chainId}`
+      `${binding.name} ${binding.address} ${binding.chainId}`
         .toLowerCase()
         .includes(needle),
     );
   }, [search, sorted]);
-
-  // Contracts imported from a project are grouped; the rest stay in one list.
-  const { loose, groups } = useMemo(() => {
-    const byProject = new Map<string, ContractBinding[]>();
-    const rest: ContractBinding[] = [];
-    for (const binding of filtered) {
-      if (!binding.project) {
-        rest.push(binding);
-        continue;
-      }
-      byProject.set(binding.project, [
-        ...(byProject.get(binding.project) ?? []),
-        binding,
-      ]);
-    }
-    return { loose: rest, groups: [...byProject.entries()] };
-  }, [filtered]);
-
-  const toggleGroup = (project: string) =>
-    setCollapsed((current) => {
-      const next = new Set(current);
-      if (!next.delete(project)) next.add(project);
-      return next;
-    });
 
   const methods = bindings.reduce(
     (total, binding) => total + (revisionFor(binding)?.counts.functions ?? 0),
@@ -279,16 +235,45 @@ export function HomePage() {
 
       <section className="recent-section">
         <PageHeader
-          eyebrow="YOUR WORKSPACE"
-          title="Contracts"
+          eyebrow="WORKSPACE"
+          title={activeWorkspace.name}
           description={
-            bindings.length
-              ? "Every interface stays on this device. Open a contract to query it or prepare a write."
-              : undefined
+            isDefault
+              ? "Contracts you added one at a time. Every interface stays on this device."
+              : "Created from a Foundry project import. Every interface stays on this device."
           }
           actions={
-            bindings.length ? (
-              <div className="recent-actions">
+            <div className="recent-actions">
+              {workspaces.length > 1 && (
+                <label className="workspace-switch">
+                  <span>Workspace</span>
+                  <select
+                    className="field"
+                    value={activeWorkspace.id}
+                    onChange={(event) => {
+                      setActiveWorkspace(event.target.value);
+                      setSearch("");
+                      setRenaming(false);
+                    }}
+                    aria-label="Switch workspace"
+                  >
+                    {workspaces.map((workspace) => (
+                      <option key={workspace.id} value={workspace.id}>
+                        {workspace.name} —{" "}
+                        {plural(
+                          allBindings.filter(
+                            (binding) =>
+                              (binding.workspaceId ?? DEFAULT_WORKSPACE_ID) ===
+                              workspace.id,
+                          ).length,
+                          "contract",
+                        )}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {bindings.length > 0 && (
                 <label className="search-field">
                   <Search size={14} />
                   <input
@@ -298,16 +283,73 @@ export function HomePage() {
                     aria-label="Search contracts"
                   />
                 </label>
-              </div>
-            ) : undefined
+              )}
+            </div>
           }
         />
+
+        {!isDefault && (
+          <div className="workspace-bar">
+            {renaming ? (
+              <form
+                className="workspace-rename"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  renameWorkspace(activeWorkspace.id, renameDraft);
+                  setRenaming(false);
+                }}
+              >
+                <input
+                  className="field"
+                  value={renameDraft}
+                  autoFocus
+                  aria-label="Workspace name"
+                  onChange={(event) => setRenameDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") setRenaming(false);
+                  }}
+                />
+                <Button type="submit" size="sm" variant="secondary">
+                  Save
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setRenaming(false)}
+                >
+                  Cancel
+                </Button>
+              </form>
+            ) : (
+              <>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setRenameDraft(activeWorkspace.name);
+                    setRenaming(true);
+                  }}
+                >
+                  Rename workspace
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  icon={<Trash2 size={13} />}
+                  onClick={() => setDeletingWorkspace(true)}
+                >
+                  Delete workspace
+                </Button>
+              </>
+            )}
+          </div>
+        )}
 
         {bindings.length === 0 ? (
           <EmptyState
             icon={<Braces size={22} />}
             eyebrow="READY WHEN YOU ARE"
-            title="No contracts in this workspace"
+            title={`No contracts in ${activeWorkspace.name}`}
             description={
               <>
                 Start with an ABI you already have. A Foundry artifact is the
@@ -339,44 +381,23 @@ export function HomePage() {
             </button>
           </div>
         ) : (
-          <div className="contract-groups">
-            {loose.length > 0 && (
-              <ContractTable
-                items={loose}
-                showHead
-                revisionFor={revisionFor}
+          <div className="contract-table">
+            <div className="contract-table-head" aria-hidden="true">
+              <span>Contract</span>
+              <span>Chain</span>
+              <span>Methods</span>
+              <span>ABI hash</span>
+              <span>Source</span>
+              <span>Opened</span>
+            </div>
+            {filtered.map((binding) => (
+              <ContractRow
+                key={binding.id}
+                binding={binding}
+                revision={revisionFor(binding)}
                 onDelete={setPendingDelete}
               />
-            )}
-            {groups.map(([project, items], index) => {
-              const open = !collapsed.has(project) || Boolean(search.trim());
-              return (
-                <div key={project} className="project-group">
-                  <button
-                    type="button"
-                    className="project-group-heading"
-                    aria-expanded={open}
-                    onClick={() => toggleGroup(project)}
-                  >
-                    <ChevronRight
-                      size={14}
-                      className={cn("project-group-chevron", open && "rotate")}
-                    />
-                    <FolderTree size={14} />
-                    <strong>{project}</strong>
-                    <span>{plural(items.length, "contract")}</span>
-                  </button>
-                  {open && (
-                    <ContractTable
-                      items={items}
-                      showHead={loose.length === 0 && index === 0}
-                      revisionFor={revisionFor}
-                      onDelete={setPendingDelete}
-                    />
-                  )}
-                </div>
-              );
-            })}
+            ))}
           </div>
         )}
       </section>
@@ -394,6 +415,20 @@ export function HomePage() {
           Storage & key settings <ArrowUpRight size={13} />
         </Link>
       </section>
+
+      <ConfirmDialog
+        open={deletingWorkspace}
+        title={`Delete workspace “${activeWorkspace.name}”?`}
+        description={`This removes its ${plural(bindings.length, "contract")}, their ABIs and transaction history from this browser. Other workspaces and the on-chain contracts are not affected.`}
+        confirmLabel="Delete workspace"
+        onCancel={() => setDeletingWorkspace(false)}
+        onConfirm={() => {
+          const name = activeWorkspace.name;
+          deleteWorkspace(activeWorkspace.id);
+          setDeletingWorkspace(false);
+          toast.success(`Workspace “${name}” deleted.`);
+        }}
+      />
 
       <ConfirmDialog
         open={pendingDelete !== null}

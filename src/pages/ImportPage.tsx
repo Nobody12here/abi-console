@@ -89,7 +89,8 @@ export function ImportPage() {
   const { address: walletAddress, chainId: walletChainId } = useAccount();
   const {
     settings,
-    bindings,
+    activeBindings: bindings,
+    activeWorkspace,
     revisionFor,
     createRevision,
     saveContract,
@@ -835,7 +836,7 @@ export function ImportPage() {
               disabled={!canOpen}
               onClick={() => openWorkspace(false)}
             >
-              {existing ? "Update ABI & open" : "Open workspace"}
+              {existing ? "Update ABI & open" : "Open contract"}
             </Button>
             <Button
               variant="secondary"
@@ -847,6 +848,9 @@ export function ImportPage() {
             </Button>
           </div>
 
+          <p className="binding-hint">
+            Saved to the workspace “{activeWorkspace.name}”.
+          </p>
           {!imported && (
             <p className="binding-hint">
               Load an ABI from step 01 to enable this action.

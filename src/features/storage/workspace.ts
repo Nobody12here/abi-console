@@ -10,6 +10,7 @@ import type {
 } from "@/features/abi/types";
 import { makeId } from "@/lib/format";
 import { bindingId } from "./ids";
+import { migrateProjects } from "./workspaces";
 
 const store = createStore("abiconsole", "workspace-v2");
 const STATE_KEY = "state";
@@ -51,6 +52,7 @@ export function defaultState(): WorkspaceState {
     bindings: [],
     revisions: [],
     txs: [],
+    workspaces: [],
     settings: defaultSettings(),
   };
 }
@@ -61,11 +63,14 @@ function hydrateState(value: unknown): WorkspaceState {
   if (!value || typeof value !== "object") return defaultState();
   const candidate = value as Partial<WorkspaceState>;
   if (candidate.version !== 2) return defaultState();
-  return {
+  // Older saves have no workspaces; contracts tagged with a project label are
+  // moved into a workspace of that name.
+  return migrateProjects({
     version: 2,
     bindings: Array.isArray(candidate.bindings) ? candidate.bindings : [],
     revisions: Array.isArray(candidate.revisions) ? candidate.revisions : [],
     txs: Array.isArray(candidate.txs) ? candidate.txs : [],
+    workspaces: Array.isArray(candidate.workspaces) ? candidate.workspaces : [],
     settings: {
       ...defaultSettings(),
       ...(candidate.settings ?? {}),
@@ -73,7 +78,7 @@ function hydrateState(value: unknown): WorkspaceState {
         ...(candidate.settings?.rpcOverrides ?? {}),
       },
     },
-  };
+  });
 }
 
 function migrateLegacy(): {

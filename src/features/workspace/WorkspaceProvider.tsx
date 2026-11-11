@@ -19,6 +19,7 @@ import type {
   Settings,
   TxRecord,
   TxStatus,
+  Workspace,
   WorkspaceState,
 } from "@/features/abi/types";
 import { bindingId, defaultState, loadWorkspace, saveTheme, saveWorkspace } from "@/features/storage/workspace";
@@ -27,6 +28,15 @@ import {
   type ProjectImportInput,
   type ProjectImportResult,
 } from "@/features/storage/projectImport";
+import {
+  allWorkspaces,
+  bindingWorkspaceId,
+  DEFAULT_WORKSPACE_ID,
+  migrateProjects,
+  removeWorkspace,
+  renameWorkspace as renameWorkspaceIn,
+  resolveActiveWorkspaceId,
+} from "@/features/storage/workspaces";
 import { makeId } from "@/lib/format";
 import { createReadClient } from "@/lib/rpc";
 import { errorMessage } from "@/features/execution/errors";
@@ -41,7 +51,16 @@ type SaveContractInput = {
 
 type WorkspaceContextValue = {
   ready: boolean;
+  /** Every saved contract, across all workspaces. */
   bindings: ContractBinding[];
+  /** Contracts in the active workspace. */
+  activeBindings: ContractBinding[];
+  /** The default workspace first, then the ones created by imports. */
+  workspaces: Workspace[];
+  activeWorkspace: Workspace;
+  setActiveWorkspace: (id: string) => void;
+  renameWorkspace: (id: string, name: string) => void;
+  deleteWorkspace: (id: string) => void;
   revisions: AbiRevision[];
   txs: TxRecord[];
   settings: Settings;
@@ -273,7 +292,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         throw new Error("Enter a valid contract address.");
       }
       const address = getAddress(input.address);
-      const id = bindingId(input.chainId, address);
+      const workspaceId = resolveActiveWorkspaceId(stateRef.current);
+      const id = bindingId(input.chainId, address, workspaceId);
       const now = new Date().toISOString();
       const existing = stateRef.current.bindings.find(
         (binding) => binding.id === id,
@@ -299,6 +319,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
             activeRevisionId: input.revisionId,
             revisionIds: [input.revisionId],
             codeInfo: input.codeInfo,
+            workspaceId: workspaceId === DEFAULT_WORKSPACE_ID ? undefined : workspaceId,
             lastOpenedAt: now,
             createdAt: now,
             updatedAt: now,
@@ -329,6 +350,35 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       return result;
     },
     [],
+  );
+
+  const setActiveWorkspace = useCallback(
+    (id: string) => {
+      apply((current) => {
+        // Unknown ids fall back to the default workspace.
+        const next = current.workspaces.some((workspace) => workspace.id === id)
+          ? id
+          : undefined;
+        return current.settings.activeWorkspaceId === next
+          ? current
+          : { ...current, settings: { ...current.settings, activeWorkspaceId: next } };
+      });
+    },
+    [apply],
+  );
+
+  const renameWorkspace = useCallback(
+    (id: string, name: string) => {
+      apply((current) => renameWorkspaceIn(current, id, name));
+    },
+    [apply],
+  );
+
+  const deleteWorkspace = useCallback(
+    (id: string) => {
+      apply((current) => removeWorkspace(current, id));
+    },
+    [apply],
   );
 
   const updateBinding = useCallback(
@@ -486,14 +536,30 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     };
 
     apply((current) => {
+      const incomingRevisions = bundle.revisions as AbiRevision[];
       const revisions = mergeUnique(
         current.revisions,
-        bundle.revisions as AbiRevision[],
+        incomingRevisions,
         (revision) => revision.hash,
       );
+      // A revision already stored (same hash) keeps its local id, so imported
+      // contracts must point at that id instead of the bundle's.
+      const byHash = new Map(revisions.map((revision) => [revision.hash, revision.id]));
+      const remap = (id: string): string => {
+        const source = incomingRevisions.find((revision) => revision.id === id);
+        return (source && byHash.get(source.hash)) ?? id;
+      };
+      const incomingBindings = (bundle.bindings as ContractBinding[]).map(
+        (binding) => ({
+          ...binding,
+          activeRevisionId: remap(binding.activeRevisionId),
+          revisionIds: [...new Set(binding.revisionIds.map(remap))],
+        }),
+      );
+
       const bindings = mergeUnique(
         current.bindings,
-        bundle.bindings as ContractBinding[],
+        incomingBindings,
         (binding) => binding.id,
       );
       const txs = mergeUnique(
@@ -501,17 +567,23 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         Array.isArray(bundle.txs) ? (bundle.txs as TxRecord[]) : [],
         (tx) => tx.id,
       );
+      const workspaces = mergeUnique(
+        current.workspaces,
+        Array.isArray(bundle.workspaces) ? (bundle.workspaces as Workspace[]) : [],
+        (workspace) => workspace.id,
+      );
       counts.revisions = revisions.length - current.revisions.length;
       counts.bindings = bindings.length - current.bindings.length;
       counts.txs = txs.length - current.txs.length;
 
-      return {
+      return migrateProjects({
         ...current,
         revisions,
         bindings,
         txs,
+        workspaces,
         settings: current.settings,
-      };
+      });
     });
 
     return counts;
@@ -522,10 +594,29 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     toast.success("Local workspace cleared.");
   }, [apply]);
 
+  const workspaces = useMemo(() => allWorkspaces(state), [state]);
+  const activeWorkspaceId = resolveActiveWorkspaceId(state);
+  const activeWorkspace =
+    workspaces.find((workspace) => workspace.id === activeWorkspaceId) ??
+    workspaces[0];
+  const activeBindings = useMemo(
+    () =>
+      state.bindings.filter(
+        (binding) => bindingWorkspaceId(binding) === activeWorkspaceId,
+      ),
+    [state.bindings, activeWorkspaceId],
+  );
+
   const value = useMemo<WorkspaceContextValue>(
     () => ({
       ready,
       bindings: state.bindings,
+      activeBindings,
+      workspaces,
+      activeWorkspace,
+      setActiveWorkspace,
+      renameWorkspace,
+      deleteWorkspace,
       revisions: state.revisions,
       txs: state.txs,
       settings: state.settings,
@@ -553,6 +644,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [
       ready,
       state.bindings,
+      activeBindings,
+      workspaces,
+      activeWorkspace,
+      setActiveWorkspace,
+      renameWorkspace,
+      deleteWorkspace,
       state.revisions,
       state.txs,
       state.settings,

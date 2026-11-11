@@ -1634,28 +1634,14 @@ textarea.field.compact {
 }
 
 
-.contract-table-head {
+/* Icon + name + address live in the first cell, so there are 7 columns. */
+.contract-table-head,
+.contract-row-main {
   display: grid;
   grid-template-columns: minmax(210px, 1.6fr) 106px 132px 96px 90px 84px 24px;
   gap: 12px;
   align-items: center;
 }
-
-.contract-row-main {
-  display: grid;
-  grid-template-columns:
-    30px
-    minmax(0, 1.6fr)
-    106px
-    132px
-    96px
-    90px
-    84px
-    24px;
-  gap: 12px;
-  align-items: center;
-}
-
 
 .contract-table-head {
   /* Right padding matches the row's action buttons so columns line up. */
@@ -5250,53 +5236,41 @@ textarea.field.compact {
   gap: 8px;
 }
 
-/* Project groups on the contracts list */
+/* Workspace switcher on the contracts list */
 
-.contract-groups {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.project-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.project-group-heading {
-  display: flex;
+.workspace-switch {
+  display: inline-flex;
   align-items: center;
   gap: 8px;
-  align-self: flex-start;
-  padding: 4px 6px 4px 2px;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-2);
-  font-size: 13px;
-}
-
-.project-group-heading:hover {
-  color: var(--text);
-}
-
-.project-group-heading strong {
-  color: var(--text);
-  font-weight: 600;
-}
-
-.project-group-heading span {
   color: var(--faint);
   font-size: 12px;
 }
 
-.project-group-chevron {
-  transition: transform 0.15s ease;
+.workspace-switch .field {
+  width: auto;
+  min-width: 170px;
+  max-width: 260px;
+  height: 34px;
 }
 
-.project-group-chevron.rotate {
-  transform: rotate(90deg);
+.workspace-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: -4px 0 12px -10px;
+}
+
+.workspace-rename {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 10px;
+}
+
+.workspace-rename .field {
+  width: 260px;
+  height: 32px;
 }
 
 @media (max-width: 900px) {
@@ -5350,7 +5324,7 @@ textarea.field.compact {
   }
 
   .contract-row-main {
-    grid-template-columns: 30px minmax(0, 1.4fr) 100px 120px 20px;
+    grid-template-columns: minmax(0, 1.4fr) 100px 120px 20px;
   }
 
   .contract-row-hash,

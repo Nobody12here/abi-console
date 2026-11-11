@@ -5,10 +5,12 @@ import type {
   CodeInfo,
   ContractBinding,
   ImportedAbi,
+  Workspace,
   WorkspaceState,
 } from "@/features/abi/types";
 import { makeId } from "@/lib/format";
 import { bindingId } from "./ids";
+import { uniqueWorkspaceName, workspaceNames } from "./workspaces";
 
 export type ProjectImportEntry = {
   name: string;
@@ -19,38 +21,45 @@ export type ProjectImportEntry = {
 };
 
 export type ProjectImportInput = {
-  /** Group label; empty or undefined leaves contracts ungrouped. */
-  project?: string;
+  /** Desired workspace name; made unique if it is already taken. */
+  name: string;
   chainId: number;
   entries: ProjectImportEntry[];
 };
 
 export type ProjectImportResult = {
+  workspaceId: string;
+  workspaceName: string;
   added: number;
-  updated: number;
-  unchanged: number;
 };
 
 /**
- * Save many contracts in one state transition. Existing contracts keep their
- * name (the user may have renamed them) and get the new ABI as a new revision.
+ * Every project import gets its own new workspace and becomes the active one,
+ * in a single state transition. Nothing in other workspaces is touched, even
+ * if the same address is already saved there.
  */
 export function applyProjectImport(
   state: WorkspaceState,
   input: ProjectImportInput,
 ): { state: WorkspaceState; result: ProjectImportResult } {
   const now = new Date().toISOString();
-  const project = input.project?.trim() || undefined;
-  const result: ProjectImportResult = { added: 0, updated: 0, unchanged: 0 };
+
+  const workspace: Workspace = {
+    id: makeId(),
+    name: uniqueWorkspaceName(input.name, workspaceNames(state)),
+    createdAt: now,
+  };
 
   const revisions = [...state.revisions];
   const revisionByHash = new Map(revisions.map((rev) => [rev.hash, rev]));
-  const bindings = new Map(state.bindings.map((binding) => [binding.id, binding]));
   const created: ContractBinding[] = [];
+  const seen = new Set<string>();
 
   for (const entry of input.entries) {
     const address = getAddress(entry.address);
-    const id = bindingId(input.chainId, address);
+    const id = bindingId(input.chainId, address, workspace.id);
+    if (seen.has(id)) continue;
+    seen.add(id);
 
     let revision = revisionByHash.get(entry.imported.hash);
     if (!revision) {
@@ -69,55 +78,33 @@ export function applyProjectImport(
       revisionByHash.set(revision.hash, revision);
     }
 
-    const existing = bindings.get(id);
-    if (existing) {
-      const nextProject = project ?? existing.project;
-      if (
-        existing.activeRevisionId === revision.id &&
-        existing.project === nextProject
-      ) {
-        result.unchanged += 1;
-        continue;
-      }
-      bindings.set(id, {
-        ...existing,
-        activeRevisionId: revision.id,
-        revisionIds: existing.revisionIds.includes(revision.id)
-          ? existing.revisionIds
-          : [...existing.revisionIds, revision.id],
-        project: nextProject,
-        updatedAt: now,
-      });
-      result.updated += 1;
-    } else {
-      const binding: ContractBinding = {
-        id,
-        name: entry.name.trim() || address,
-        chainId: input.chainId,
-        address,
-        activeRevisionId: revision.id,
-        revisionIds: [revision.id],
-        codeInfo: entry.codeInfo,
-        project,
-        lastOpenedAt: now,
-        createdAt: now,
-        updatedAt: now,
-      };
-      bindings.set(id, binding);
-      created.push(binding);
-      result.added += 1;
-    }
+    created.push({
+      id,
+      name: entry.name.trim() || address,
+      chainId: input.chainId,
+      address,
+      activeRevisionId: revision.id,
+      revisionIds: [revision.id],
+      codeInfo: entry.codeInfo,
+      workspaceId: workspace.id,
+      lastOpenedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    });
   }
 
-  const createdIds = new Set(created.map((binding) => binding.id));
-  const next: WorkspaceState = {
-    ...state,
-    revisions,
-    // New contracts first, in deployment order, then everything that was there.
-    bindings: [
-      ...created,
-      ...[...bindings.values()].filter((binding) => !createdIds.has(binding.id)),
-    ],
+  return {
+    state: {
+      ...state,
+      workspaces: [...state.workspaces, workspace],
+      revisions,
+      bindings: [...created, ...state.bindings],
+      settings: { ...state.settings, activeWorkspaceId: workspace.id },
+    },
+    result: {
+      workspaceId: workspace.id,
+      workspaceName: workspace.name,
+      added: created.length,
+    },
   };
-  return { state: next, result };
 }

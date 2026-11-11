@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { isAddress, type Address } from "viem";
+import { getAddress, isAddress, type Address } from "viem";
 import toast from "react-hot-toast";
 import {
   AlertTriangle,
@@ -16,7 +16,7 @@ import {
   abiReadFunctions,
   abiWriteFunctions,
 } from "@/features/abi/utils";
-import { bindingId } from "@/features/storage/workspace";
+import { bindingWorkspaceId } from "@/features/storage/workspaces";
 import { createReadClient } from "@/lib/rpc";
 import { inspectContract } from "@/lib/proxy";
 import { chainName } from "@/lib/chains";
@@ -97,8 +97,18 @@ function MissingContract({
 
 export function ContractPage() {
   const params = useParams();
-  const { ready, bindings, txs, settings, revisionFor, getRevision, touchBinding, updateBinding } =
-    useWorkspace();
+  const {
+    ready,
+    bindings,
+    txs,
+    settings,
+    activeWorkspace,
+    setActiveWorkspace,
+    revisionFor,
+    getRevision,
+    touchBinding,
+    updateBinding,
+  } = useWorkspace();
 
   const chainId = Number(params.chainId);
   const address = params.address;
@@ -107,9 +117,17 @@ export function ContractPage() {
     if (!address || !isAddress(address) || !Number.isFinite(chainId)) {
       return undefined;
     }
-    const id = bindingId(chainId, address);
-    return bindings.find((entry) => entry.id === id);
-  }, [bindings, chainId, address]);
+    // The same address can be saved in several workspaces; prefer the one
+    // being viewed, otherwise open the first match.
+    const normalized = getAddress(address);
+    const matches = bindings.filter(
+      (entry) => entry.chainId === chainId && entry.address === normalized,
+    );
+    return (
+      matches.find((entry) => bindingWorkspaceId(entry) === activeWorkspace.id) ??
+      matches[0]
+    );
+  }, [bindings, chainId, address, activeWorkspace.id]);
 
   const revision = revisionFor(binding);
   const bindingRevisions = useMemo<AbiRevision[]>(() => {
@@ -141,6 +159,12 @@ export function ContractPage() {
       return inspectContract(client, binding!.address as Address, binding!.chainId);
     },
   });
+
+  useEffect(() => {
+    // Opening a contract from a link switches to the workspace it lives in.
+    if (binding) setActiveWorkspace(bindingWorkspaceId(binding));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [binding?.id]);
 
   useEffect(() => {
     if (!binding) return;

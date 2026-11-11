@@ -53,7 +53,9 @@ export type ContractBinding = {
   activeRevisionId: string;
   revisionIds: string[];
   codeInfo?: CodeInfo;
-  /** Set when the contract came from a bulk project import; used for grouping. */
+  /** Workspace this contract belongs to; absent means the default workspace. */
+  workspaceId?: string;
+  /** Legacy grouping label, migrated into a workspace on load. */
   project?: string;
   lastOpenedAt: string;
   createdAt: string;
@@ -94,8 +96,17 @@ export type TxRecord = {
 
 export type ThemeMode = "dark" | "light" | "system";
 
+/** A named set of contracts, for example everything from one Foundry project. */
+export type Workspace = {
+  id: string;
+  name: string;
+  createdAt: string;
+};
+
 export type Settings = {
   theme: ThemeMode;
+  /** Workspace shown on the contracts page; absent means the default one. */
+  activeWorkspaceId?: string;
   lastChainId?: number;
   rpcOverrides: Record<number, string>;
   etherscanKey: string;
@@ -108,6 +119,8 @@ export type WorkspaceState = {
   bindings: ContractBinding[];
   revisions: AbiRevision[];
   txs: TxRecord[];
+  /** Workspaces created by imports. The default workspace is implicit. */
+  workspaces: Workspace[];
   settings: Settings;
 };
 
